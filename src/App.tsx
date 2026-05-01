@@ -24,6 +24,7 @@ import {
 
 const PnLChart = lazy(() => import('./components/PnLChart').then((module) => ({ default: module.PnLChart })));
 const APP_VERSION = '0.1.2';
+const CURRENT_YEAR = new Date().getFullYear();
 
 function App() {
   const {
@@ -393,7 +394,9 @@ function App() {
       setLastUpdatedAt(Date.now());
     } catch (err: any) {
       if (abortController.signal.aborted || !isLatestRequest()) return;
-      console.error('[fetchData] Error:', err.message);
+      if (import.meta.env.DEV) {
+        console.error('[fetchData] Error:', err.message);
+      }
       setError(err.message || 'Failed to fetch data');
     } finally {
       if (isLatestRequest()) {
@@ -615,7 +618,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <span>© 2026 DECIBEL 做市看板</span>
+        <span>© {CURRENT_YEAR} DECIBEL 做市看板</span>
         <span>v{APP_VERSION}</span>
         <span>配置仅保存在本地浏览器</span>
       </footer>

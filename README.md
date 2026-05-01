@@ -51,7 +51,7 @@ npm run preview
 3. 添加主钱包地址，也就是 Owner Wallet
 4. 刷新或等待自动刷新后查看数据
 
-API Key、钱包地址和别名默认保存在当前浏览器的 `localStorage` 中。导出的配置文件不包含 API Key。
+API Key、钱包地址和别名默认保存在当前浏览器的 `localStorage` 中。导出的配置文件不包含 API Key，页面也不会把 API Key 上传到网站服务器。
 
 ## 数据源
 

@@ -701,6 +701,16 @@ body {
   margin-top: 8px;
 }
 
+.settings-link {
+  color: var(--accent-hover);
+  text-decoration: none;
+}
+
+.settings-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
 .settings-message {
   border: 1px solid var(--border);
   border-radius: 8px;

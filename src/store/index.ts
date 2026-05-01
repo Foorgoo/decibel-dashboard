@@ -52,6 +52,11 @@ const readAliasStorage = (): AliasStorage => {
 };
 
 if (typeof window !== 'undefined') {
+  const legacyApiKey = localStorage.getItem('decibel_api_key');
+  if (legacyApiKey && !localStorage.getItem('decibel_api_key_mainnet')) {
+    localStorage.setItem('decibel_api_key_mainnet', legacyApiKey);
+  }
+  localStorage.removeItem('decibel_api_key');
   localStorage.removeItem('decibel_api_key_testnet');
   localStorage.removeItem('decibel_network');
   localStorage.removeItem('decibel_subaccount_aliases_testnet');
@@ -107,7 +112,7 @@ interface DashboardState {
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
-  apiKey: localStorage.getItem('decibel_api_key') || '',
+  apiKey: localStorage.getItem('decibel_api_key_mainnet') || '',
   accounts: (() => {
     try {
       return JSON.parse(localStorage.getItem('decibel_accounts') || '[]');
@@ -135,7 +140,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   error: null,
   
   setApiKey: (key) => {
-    localStorage.setItem('decibel_api_key', key);
+    if (key) {
+      localStorage.setItem('decibel_api_key_mainnet', key);
+    } else {
+      localStorage.removeItem('decibel_api_key_mainnet');
+    }
     set({ apiKey: key });
   },
   setAccounts: (accounts) => {

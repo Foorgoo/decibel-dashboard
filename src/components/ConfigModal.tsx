@@ -312,7 +312,15 @@ export function ConfigModal({
           </div>
         </div>
         <div className="settings-hint">
-          API Key 仅保存在当前浏览器本地，不会写入配置导出文件。正式部署时建议迁移到后端加密保存或后端代理。
+          API Key 仅保存在当前浏览器本地，不会写入配置导出文件，也不会上传到网站服务器。更换浏览器或设备后需要重新配置。
+          {' '}
+          新用户可前往
+          {' '}
+          <a className="settings-link" href="https://geomi.dev" target="_blank" rel="noreferrer">
+            Geomi
+          </a>
+          {' '}
+          注册并创建 API Key。
         </div>
       </>
     );

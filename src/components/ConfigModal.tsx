@@ -24,12 +24,20 @@ const maskAddress = (address: string) => `${address.slice(0, 6)}...${address.sli
 
 const CONFIG_VERSION = 1;
 
+const readJsonStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || '') as T;
+  } catch {
+    return fallback;
+  }
+};
+
 const getLocalConfig = () => ({
   version: CONFIG_VERSION,
   exported_at: new Date().toISOString(),
-  accounts: JSON.parse(localStorage.getItem('decibel_accounts') || '[]'),
+  accounts: readJsonStorage('decibel_accounts', []),
   current_account: localStorage.getItem('decibel_current_account') || null,
-  subaccount_aliases: JSON.parse(localStorage.getItem('decibel_subaccount_aliases_mainnet') || '{}'),
+  subaccount_aliases: readJsonStorage('decibel_subaccount_aliases_mainnet', {}),
 });
 
 const downloadTextFile = (filename: string, content: string) => {
@@ -40,6 +48,48 @@ const downloadTextFile = (filename: string, content: string) => {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+};
+
+const normalizeImportedAccounts = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    throw new Error('配置文件缺少 accounts');
+  }
+
+  const seen = new Set<string>();
+  return value.reduce<{ address: string; name?: string }[]>((list, item) => {
+    const address = String(item?.address || '').trim();
+    if (!isAptosAddress(address)) return list;
+
+    const normalizedAddress = address.toLowerCase();
+    if (seen.has(normalizedAddress)) return list;
+    seen.add(normalizedAddress);
+
+    const name = typeof item?.name === 'string' ? item.name.trim().slice(0, 48) : '';
+    list.push({ address, name: name || undefined });
+    return list;
+  }, []);
+};
+
+const normalizeImportedAliases = (value: unknown) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, Record<string, string>>>((owners, [owner, aliases]) => {
+    if (!aliases || typeof aliases !== 'object' || Array.isArray(aliases)) return owners;
+
+    const ownerKey = owner === 'legacy' ? 'legacy' : owner.toLowerCase();
+    const normalizedAliases = Object.entries(aliases as Record<string, unknown>).reduce<Record<string, string>>((items, [address, alias]) => {
+      if (typeof alias !== 'string') return items;
+      const trimmedAlias = alias.trim().slice(0, 48);
+      if (!trimmedAlias) return items;
+      items[address.toLowerCase()] = trimmedAlias;
+      return items;
+    }, {});
+
+    if (Object.keys(normalizedAliases).length > 0) {
+      owners[ownerKey] = normalizedAliases;
+    }
+    return owners;
+  }, {});
 };
 
 const groupSubaccountsByOwner = (
@@ -140,20 +190,24 @@ export function ConfigModal({
     try {
       const text = await file.text();
       const config = JSON.parse(text);
-      if (!Array.isArray(config.accounts)) {
-        throw new Error('配置文件缺少 accounts');
+      const importedAccounts = normalizeImportedAccounts(config.accounts);
+      if (importedAccounts.length === 0) {
+        throw new Error('配置文件没有有效主钱包地址');
       }
+      const importedAliases = normalizeImportedAliases(config.subaccount_aliases);
 
-      localStorage.setItem('decibel_accounts', JSON.stringify(config.accounts));
+      localStorage.setItem('decibel_accounts', JSON.stringify(importedAccounts));
       if (typeof config.current_account === 'string' || config.current_account === null) {
-        if (config.current_account) {
+        const currentAccountIsValid = config.current_account === 'all'
+          || importedAccounts.some((account) => account.address.toLowerCase() === String(config.current_account).toLowerCase());
+        if (config.current_account && currentAccountIsValid) {
           localStorage.setItem('decibel_current_account', config.current_account);
         } else {
           localStorage.removeItem('decibel_current_account');
         }
       }
-      if (config.subaccount_aliases && typeof config.subaccount_aliases === 'object') {
-        localStorage.setItem('decibel_subaccount_aliases_mainnet', JSON.stringify(config.subaccount_aliases));
+      if (Object.keys(importedAliases).length > 0) {
+        localStorage.setItem('decibel_subaccount_aliases_mainnet', JSON.stringify(importedAliases));
       }
 
       setConfigMessage({ type: 'success', text: '配置已导入，页面将刷新以应用变更' });

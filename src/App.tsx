@@ -620,7 +620,16 @@ function App() {
       <footer className="app-footer">
         <span>© {CURRENT_YEAR} DECIBEL 做市看板</span>
         <span>v{APP_VERSION}</span>
-        <span>配置仅保存在本地浏览器</span>
+        <span>
+          <a href="https://github.com/Foorgoo/decibel-dashboard" target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        </span>
+        <span>
+          <a href="https://x.com/FunsMove" target="_blank" rel="noreferrer">
+            X
+          </a>
+        </span>
       </footer>
 
       {showConfig && (

@@ -100,8 +100,8 @@ export function AccountStats() {
               )}
             </div>
             {ampsDailyDelta !== null && (
-              <div className={`stat-change ${ampsDailyDelta >= 0 ? 'positive' : 'negative'}`}>
-                今日新增: {ampsDailyDelta >= 0 ? '+' : ''}{AMP_FORMAT.format(ampsDailyDelta)}
+              <div className="stat-change positive">
+                今日新增: +{AMP_FORMAT.format(Math.max(0, ampsDailyDelta))}
               </div>
             )}
           </>

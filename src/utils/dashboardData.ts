@@ -48,7 +48,12 @@ export const getAmpDailyDelta = (accountKey: string, currentAmps: number) => {
     return 0;
   }
 
-  return currentAmps - storedBaseline;
+  if (currentAmps < storedBaseline) {
+    localStorage.setItem(storageKey, String(currentAmps));
+    return 0;
+  }
+
+  return Math.max(0, currentAmps - storedBaseline);
 };
 
 export const sumAccountFields = (accounts: any[]) => {

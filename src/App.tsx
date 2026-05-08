@@ -118,6 +118,8 @@ function App() {
   const activeRequestIdRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
   const tradesRequestIdRef = useRef(0);
+  const portfolioRequestIdRef = useRef(0);
+  const portfolioChartTypeRef = useRef(portfolioChartType);
   const canFetch = () => Date.now() - lastFetchRef.current > 5000;
   const markFetchStarted = () => {
     lastFetchRef.current = Date.now();
@@ -132,6 +134,10 @@ function App() {
     const key = localStorage.getItem('decibel_api_key_mainnet');
     return key || apiKey || null;
   };
+
+  useEffect(() => {
+    portfolioChartTypeRef.current = portfolioChartType;
+  }, [portfolioChartType]);
 
   const fetchData = useCallback(async (range = '24h') => {
     const keyToUse = getApiKeyForNetwork();
@@ -295,7 +301,7 @@ function App() {
           retryRequest(() => client.getAccount(tradingAccount.address), 3),
           retryRequest(() => client.getPositions(tradingAccount.address), 2),
           retryRequest(() => client.getOpenOrders(tradingAccount.address), 2),
-          retryRequest(() => client.getPortfolioChartData(tradingAccount.address, range as any, portfolioChartType), 2),
+          retryRequest(() => client.getPortfolioChartData(tradingAccount.address, range as any, portfolioChartTypeRef.current), 2),
         ]);
 
         if (accountDataResult.status !== 'fulfilled') {
@@ -449,6 +455,7 @@ function App() {
         let totalAmps = 0;
         let bestRank: number | null = null;
         let foundAmps = false;
+        const ownerAmpEntries: { owner: string; amps: number }[] = [];
 
         for (const owner of ownersToFetch) {
           const pointsData = await client.getPointsLeaderboard(owner);
@@ -463,6 +470,7 @@ function App() {
           if (amps !== null) {
             foundAmps = true;
             totalAmps += amps;
+            ownerAmpEntries.push({ owner, amps });
 
             const rank = Number(userEntry?.rank);
             if (Number.isFinite(rank)) {
@@ -472,9 +480,11 @@ function App() {
         }
 
         if (foundAmps) {
-          const ampDeltaKey = ownersToFetch.length === 1 ? ownersToFetch[0] : `all_${[...ownersToFetch].sort().join('_')}`;
+          const totalDailyDelta = ownerAmpEntries.reduce((sum, entry) => (
+            sum + (getAmpDailyDelta(entry.owner, entry.amps) || 0)
+          ), 0);
           if (!isLatestRequest()) return;
-          setAmps(totalAmps, ownersToFetch.length === 1 ? bestRank : null, getAmpDailyDelta(ampDeltaKey, totalAmps));
+          setAmps(totalAmps, ownersToFetch.length === 1 ? bestRank : null, totalDailyDelta);
         } else {
           if (!isLatestRequest()) return;
         }
@@ -500,7 +510,7 @@ function App() {
         activeAbortRef.current = null;
       }
     }
-  }, [accounts, effectiveAccount, portfolioChartType, setAccount, setPositions, setOpenOrders, setTrades, setVolume30d, setPortfolioData, setMarkets, setMarketMap, setSubaccounts, subaccountAliases, setAmps, setLoading, setError]);
+  }, [accounts, effectiveAccount, setAccount, setPositions, setOpenOrders, setTrades, setVolume30d, setPortfolioData, setMarkets, setMarketMap, setSubaccounts, subaccountAliases, setAmps, setLoading, setError]);
 
   const loadRecentTrades = useCallback(async () => {
     const keyToUse = getApiKeyForNetwork();
@@ -612,16 +622,63 @@ function App() {
     }
   }, [accounts, effectiveAccount, setError, setTrades, subaccountAliases]);
 
+  const loadPortfolioChart = useCallback(async (
+    range: string,
+    chartType: 'pnl' | 'account_value',
+  ) => {
+    const keyToUse = getApiKeyForNetwork();
+    const ownersToFetch = getSelectedOwners(effectiveAccount, accounts);
+    if (!keyToUse || ownersToFetch.length === 0) return;
+
+    const selectedOwnerKeys = new Set(ownersToFetch.map((owner) => normalizeAddress(owner)));
+    const tradingAccounts = useDashboardStore.getState().subaccounts.filter((subaccount) => (
+      subaccount.owner && selectedOwnerKeys.has(normalizeAddress(subaccount.owner))
+    ));
+
+    if (tradingAccounts.length === 0) {
+      fetchData(range);
+      return;
+    }
+
+    const requestId = portfolioRequestIdRef.current + 1;
+    portfolioRequestIdRef.current = requestId;
+    const isLatestPortfolioRequest = () => portfolioRequestIdRef.current === requestId;
+    const client = createDecibelClient(keyToUse);
+
+    try {
+      const portfolioResults = await Promise.allSettled(
+        tradingAccounts.map((tradingAccount) => (
+          client.getPortfolioChartData(tradingAccount.address, range as any, chartType)
+        ))
+      );
+      if (!isLatestPortfolioRequest()) return;
+
+      const portfolioSeries = portfolioResults
+        .filter((result): result is PromiseFulfilledResult<any[]> => result.status === 'fulfilled' && Array.isArray(result.value))
+        .map((result) => result.value);
+
+      if (portfolioSeries.length === 0) return;
+
+      const aggregatedPortfolioData = aggregatePortfolioData(portfolioSeries);
+      if (aggregatedPortfolioData.length > 0) {
+        setPortfolioData(aggregatedPortfolioData);
+      }
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.warn('[portfolio_chart] Failed:', error?.message || error);
+      }
+    }
+  }, [accounts, effectiveAccount, fetchData, setPortfolioData]);
+
   const handleRangeChange = (range: any) => {
     setChartRange(range);
-    const keyToUse = getApiKeyForNetwork();
-    if (keyToUse && selectedOwners.length > 0) {
-      fetchData(range);
-    }
+    loadPortfolioChart(range, portfolioChartType);
   };
 
   const handlePortfolioChartTypeChange = (type: 'pnl' | 'account_value') => {
     setPortfolioChartType(type);
+    portfolioChartTypeRef.current = type;
+    loadPortfolioChart(chartRange, type);
   };
 
   const handleRefresh = () => {

@@ -15,7 +15,7 @@ import {
 import { normalizeAddress } from '../../utils/dashboardData';
 import { notifyTradingAuthStateChanged } from './events';
 import { useDetectedWalletAddress } from './walletAccount';
-import { markWalletConnectIntent, pickPreferredWallet } from './wallets';
+import { getSupportedWalletLabel, isPetraWallet, markWalletConnectIntent, pickPreferredWallet } from './wallets';
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -66,7 +66,7 @@ export function TradingAuthorizationPanel({ onClose }: TradingAuthorizationPanel
   );
   const walletMismatchSelectedOwner = Boolean(selectedOwner && ownerAddress && !walletMatchesSelectedOwner);
 
-  const detectedWallets = wallets.filter((item) => item.readyState === 'Installed');
+  const detectedWallets = wallets.filter((item) => item.readyState === 'Installed' && isPetraWallet(item));
   const tradableSubaccounts = useMemo(() => (
     subaccounts.filter((item) => (
       item.address
@@ -184,7 +184,7 @@ export function TradingAuthorizationPanel({ onClose }: TradingAuthorizationPanel
   const handleConnect = async (walletName?: string) => {
     const name = walletName || pickPreferredWallet(wallets)?.name;
     if (!name) {
-      setMessage({ type: 'error', text: '未检测到可用 Aptos 钱包，请先安装 Petra / Nightly / OKX 等钱包' });
+      setMessage({ type: 'error', text: `未检测到 ${getSupportedWalletLabel()} 钱包，请先安装或启用 Petra` });
       return;
     }
     try {

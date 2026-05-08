@@ -162,7 +162,7 @@ export function TradingWalletStatus() {
         </span>
         {!isMultiAccountMode && connectedOwnerKnown && (
           <strong className="trading-wallet-address">
-            {wallet?.name || 'Wallet'} · {formatAddress(ownerAddress || '')}
+            {formatAddress(ownerAddress || '')}
           </strong>
         )}
         {showStatusReminder && <span className="trading-account-state">{statusLabel}</span>}

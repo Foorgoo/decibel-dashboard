@@ -1,5 +1,5 @@
 import { AptosWalletAdapterProvider, useWallet } from '@aptos-labs/wallet-adapter-react';
-import { Network } from '@aptos-labs/ts-sdk';
+import type { Network } from '@aptos-labs/ts-sdk';
 import { useEffect, useRef } from 'react';
 import App from '../../App';
 import { useDashboardStore } from '../../store';
@@ -10,6 +10,7 @@ import { consumeWalletConnectIntent } from './wallets';
 const localApiKey = typeof window !== 'undefined'
   ? localStorage.getItem('decibel_api_key_mainnet') || undefined
   : undefined;
+const APTOS_MAINNET = 'mainnet' as Network;
 
 function WalletOwnerSync() {
   const { account, connected, wallet } = useWallet();
@@ -68,11 +69,12 @@ function WalletOwnerSync() {
 export function TradingRoot() {
   return (
     <AptosWalletAdapterProvider
+      optInWallets={['Petra']}
       autoConnect
       disableTelemetry
       dappConfig={{
-        network: Network.MAINNET,
-        aptosApiKeys: localApiKey ? { [Network.MAINNET]: localApiKey } : undefined,
+        network: APTOS_MAINNET,
+        aptosApiKeys: localApiKey ? { [APTOS_MAINNET]: localApiKey } : undefined,
       }}
     >
       <WalletOwnerSync />

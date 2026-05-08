@@ -1,19 +1,27 @@
 {
   "name": "decibel-dashboard",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "vite --mode trading",
+    "dev:dashboard": "vite --mode dashboard",
+    "dev:trading": "vite --mode trading",
+    "build": "tsc && vite build --mode trading",
+    "build:dashboard": "tsc && vite build --mode dashboard",
+    "build:trading": "tsc && vite build --mode trading",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aptos-labs/gas-station-client": "^2.0.3",
+    "@aptos-labs/ts-sdk": "^5.2.1",
+    "@aptos-labs/wallet-adapter-react": "^8.3.3",
+    "@decibeltrade/sdk": "^0.6.0",
+    "clsx": "^2.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
-    "zustand": "^4.5.2",
-    "clsx": "^2.1.1"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

@@ -51,12 +51,8 @@ class DecibelClient {
   }
 
   async getOpenOrders(account: string): Promise<Order[]> {
-    try {
-      const result = await this.request<{ items: Order[] }>('/open_orders', { account });
-      return result.items || [];
-    } catch (e) {
-      return [];
-    }
+    const result = await this.request<{ items: Order[] }>('/open_orders', { account });
+    return result.items || [];
   }
 
   async getOrderHistory(account: string, limit = '50'): Promise<Order[]> {
@@ -71,9 +67,10 @@ class DecibelClient {
 
   async getPortfolioChartData(
     account: string,
-    period: '24h' | '7d' | '30d' | '90d' | 'all' = '7d'
+    period: '24h' | '7d' | '30d' | '90d' | 'all' = '7d',
+    dataType: 'pnl' | 'account_value' = 'pnl',
   ): Promise<PortfolioDataPoint[]> {
-    return this.request<PortfolioDataPoint[]>('/portfolio_chart', { account, range: period, data_type: 'pnl' });
+    return this.request<PortfolioDataPoint[]>('/portfolio_chart', { account, range: period, data_type: dataType });
   }
 
   async getMarkets(): Promise<Market[]> {

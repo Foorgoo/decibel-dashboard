@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { PositionPricePanel } from './PositionPricePanel';
+import { IS_TRADING_MODE } from '../config/appMode';
+
+const ClosePositionActions = lazy(() => import('../features/trading/ClosePositionActions').then((module) => ({
+  default: module.ClosePositionActions,
+})));
 
 const CURRENCY = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -20,9 +25,14 @@ const formatAddress = (address?: string) => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
+const formatAliasAddress = (address?: string) => {
+  if (!address) return '-';
+  return address.slice(0, 6);
+};
+
 const getSubaccountLabel = (pos: any) => {
   const address = pos.subaccount || '';
-  const addressLabel = formatAddress(address);
+  const addressLabel = pos.subaccount_name ? formatAliasAddress(address) : formatAddress(address);
   return pos.subaccount_name ? `${pos.subaccount_name} (${addressLabel})` : addressLabel;
 };
 
@@ -45,6 +55,15 @@ const getMarginMode = (pos: any) => {
   if (pos.is_isolated === false) return '全仓';
   return '';
 };
+
+const getPositionFunding = (pos: any) => {
+  const value = pos.unrealized_funding ?? pos.unrealized_funding_cost ?? pos.funding;
+  const funding = Number(value);
+  return Number.isFinite(funding) ? funding : null;
+};
+
+const formatSignedCurrency = (value: number) => `${value > 0 ? '+' : ''}${CURRENCY.format(value)}`;
+const getFundingDisplayValue = (fundingCost: number) => -fundingCost;
 
 type SortKey = 'market' | 'subaccount' | 'side' | 'size' | 'value' | 'entry' | 'mark' | 'pnl' | 'liq' | 'margin' | 'funding';
 type SortDirection = 'asc' | 'desc';
@@ -98,7 +117,7 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
       case 'margin':
         return getPositionMargin(pos) || 0;
       case 'funding':
-        return Number(pos.unrealized_funding || pos.unrealized_funding_cost || pos.funding || 0);
+        return getPositionFunding(pos) ?? 0;
       default:
         return 0;
     }
@@ -157,8 +176,8 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
         <table className="data-table">
           <thead>
             <tr className="table-header-row">
-              <th>{renderSortHeader('market', '市场币种')}</th>
               <th>{renderSortHeader('subaccount', '子账户')}</th>
+              <th>{renderSortHeader('market', '市场币种')}</th>
               <th>{renderSortHeader('side', '方向')}</th>
               <th>{renderSortHeader('size', '数量')}</th>
               <th>{renderSortHeader('value', '价值')}</th>
@@ -168,6 +187,7 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
               <th>{renderSortHeader('liq', '清算价')}</th>
               <th>{renderSortHeader('margin', '保证金')}</th>
               <th>{renderSortHeader('funding', '资金费')}</th>
+              {IS_TRADING_MODE && <th>平仓</th>}
             </tr>
           </thead>
           <tbody>
@@ -180,7 +200,8 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
               const leverage = getPositionLeverage(pos);
               const margin = getPositionMargin(pos);
               const marginMode = getMarginMode(pos);
-              const funding = Number(pos.unrealized_funding || pos.unrealized_funding_cost || pos.funding || 0);
+              const funding = getPositionFunding(pos);
+              const fundingDisplayValue = funding !== null ? getFundingDisplayValue(funding) : null;
               const pnl = Number.isFinite(Number(pos.pnl))
                 ? Number(pos.pnl)
                 : (markPrice > 0 && entryPrice > 0)
@@ -192,13 +213,13 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
               
               return (
                 <tr key={`${pos.market || 'position'}-${idx}`} className="table-row">
+                  <td className="mono subaccount-cell" title={pos.subaccount}>
+                    {getSubaccountLabel(pos)}
+                  </td>
                   <td>
                     <button className="market-trigger" onClick={() => setSelectedPosition(pos)}>
                       <MarketLabel marketName={marketName} />
                     </button>
-                  </td>
-                  <td className="mono subaccount-cell" title={pos.subaccount}>
-                    {getSubaccountLabel(pos)}
                   </td>
                   <td>
                     <span className={`side-badge ${side}`}>
@@ -221,9 +242,16 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
                       </span>
                     ) : '-'}
                   </td>
-                  <td className={`mono ${funding <= 0 ? 'positive' : 'negative'}`}>
-                    {funding ? CURRENCY.format(funding) : '-'}
+                  <td className={`mono ${fundingDisplayValue === null || fundingDisplayValue === 0 ? '' : fundingDisplayValue > 0 ? 'positive' : 'negative'}`}>
+                    {fundingDisplayValue !== null ? formatSignedCurrency(fundingDisplayValue) : '-'}
                   </td>
+                  {IS_TRADING_MODE && (
+                    <td>
+                      <Suspense fallback={<span className="text-muted">-</span>}>
+                        <ClosePositionActions position={pos} />
+                      </Suspense>
+                    </td>
+                  )}
                 </tr>
               );
             })}

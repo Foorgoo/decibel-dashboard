@@ -8,17 +8,29 @@ type TabKey = 'positions' | 'orders' | 'trades';
 
 interface DataTabsProps {
   showTrades: boolean;
+  tradesLoading?: boolean;
+  onActiveTabChange?: (tab: TabKey) => void;
+  onTradesTabOpen?: () => void;
 }
 
-export function DataTabs({ showTrades }: DataTabsProps) {
-  const { positions, openOrders, trades } = useDashboardStore();
+export function DataTabs({ showTrades, tradesLoading = false, onActiveTabChange, onTradesTabOpen }: DataTabsProps) {
+  const { currentAccount, positions, openOrders, trades } = useDashboardStore();
   const [activeTab, setActiveTab] = useState<TabKey>('positions');
+  const maxTradeCount = currentAccount === 'all' ? 500 : 200;
 
   useEffect(() => {
     if (!showTrades && activeTab === 'trades') {
       setActiveTab('positions');
     }
   }, [activeTab, showTrades]);
+
+  useEffect(() => {
+    setActiveTab('positions');
+  }, [currentAccount]);
+
+  useEffect(() => {
+    onActiveTabChange?.(activeTab);
+  }, [activeTab, onActiveTabChange]);
 
   return (
     <div className="chart-section">
@@ -38,9 +50,12 @@ export function DataTabs({ showTrades }: DataTabsProps) {
         {showTrades && (
           <button
             className={`tab-btn ${activeTab === 'trades' ? 'active' : ''}`}
-            onClick={() => setActiveTab('trades')}
+            onClick={() => {
+              setActiveTab('trades');
+              onTradesTabOpen?.();
+            }}
           >
-            最近成交 <span>{Math.min(trades.length, 200)}</span>
+            最近成交 <span>{tradesLoading ? '...' : Math.min(trades.length, maxTradeCount)}</span>
           </button>
         )}
       </div>

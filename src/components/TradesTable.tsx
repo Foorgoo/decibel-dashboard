@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 
@@ -19,9 +19,14 @@ const formatAddress = (address?: string) => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
+const formatAliasAddress = (address?: string) => {
+  if (!address) return '-';
+  return address.slice(0, 6);
+};
+
 const getSubaccountLabel = (trade: any) => {
   const address = trade.subaccount || '';
-  const addressLabel = formatAddress(address);
+  const addressLabel = trade.subaccount_name ? formatAliasAddress(address) : formatAddress(address);
   return trade.subaccount_name ? `${trade.subaccount_name} (${addressLabel})` : addressLabel;
 };
 
@@ -66,13 +71,21 @@ const getSourceClassName = (source?: string) => {
 };
 
 export function TradesTable() {
-  const { trades } = useDashboardStore();
-  const [visibleCount, setVisibleCount] = useState(10);
+  const { currentAccount, trades } = useDashboardStore();
+  const isMultiAccountMode = currentAccount === 'all';
+  const initialVisibleCount = isMultiAccountMode ? 20 : 10;
+  const loadStep = isMultiAccountMode ? 20 : 10;
+  const maxRows = isMultiAccountMode ? 500 : 200;
+  const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
+
+  useEffect(() => {
+    setVisibleCount(initialVisibleCount);
+  }, [initialVisibleCount, trades.length]);
 
   const rows = (Array.isArray(trades) ? trades : [])
     .slice()
     .sort((a, b) => getTradeTimestamp(b) - getTradeTimestamp(a))
-    .slice(0, 200);
+    .slice(0, maxRows);
   const visibleRows = rows.slice(0, visibleCount);
   const hasMore = visibleCount < rows.length;
 
@@ -89,9 +102,9 @@ export function TradesTable() {
       <table className="data-table">
         <thead>
           <tr className="table-header-row">
+            <th>子账户</th>
             <th>时间</th>
             <th>市场币种</th>
-            <th>子账户</th>
             <th>方向</th>
             <th>来源</th>
             <th>数量</th>
@@ -108,11 +121,15 @@ export function TradesTable() {
             const side = getTradeSide(trade);
             const source = String(trade.source || '');
             const value = Number(trade.value || 0);
-            const realizedPnl = Number(trade.realized_pnl || 0);
+            const realizedPnl = Number(trade.realized_pnl);
             const fee = Number(trade.fee || 0);
+            const hasRealizedPnl = Number.isFinite(realizedPnl);
 
             return (
               <tr key={trade.trade_id || trade.id || `${trade.market || 'trade'}-${timestamp}-${idx}`} className="table-row">
+                <td className="mono subaccount-cell" title={trade.subaccount}>
+                  {getSubaccountLabel(trade)}
+                </td>
                 <td className="mono">
                   {timestamp ? new Date(timestamp).toLocaleString('zh-CN', {
                     month: '2-digit',
@@ -126,9 +143,6 @@ export function TradesTable() {
                 <td>
                   <MarketLabel marketName={marketName} />
                 </td>
-                <td className="mono subaccount-cell" title={trade.subaccount}>
-                  {getSubaccountLabel(trade)}
-                </td>
                 <td>
                   <span className={`side-badge ${side === 'BUY' ? 'buy' : side === 'SELL' ? 'sell' : ''}`}>
                     {side}
@@ -141,25 +155,25 @@ export function TradesTable() {
                 <td className="mono">{Number(trade.price || 0) > 0 ? CURRENCY.format(Number(trade.price)) : '-'}</td>
                 <td className="mono">{value > 0 ? CURRENCY.format(value) : '-'}</td>
                 <td className="mono">{fee ? CURRENCY.format(fee) : '-'}</td>
-                <td className={`mono ${realizedPnl >= 0 ? 'positive' : 'negative'}`}>
-                  {realizedPnl ? `${realizedPnl > 0 ? '+' : ''}${CURRENCY.format(realizedPnl)}` : '-'}
+                <td className={`mono ${!hasRealizedPnl || realizedPnl >= 0 ? 'positive' : 'negative'}`}>
+                  {hasRealizedPnl ? `${realizedPnl > 0 ? '+' : ''}${CURRENCY.format(realizedPnl)}` : '-'}
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
-      {rows.length > 10 && (
+      {rows.length > initialVisibleCount && (
         <div className="table-footer-actions">
           {hasMore ? (
             <button
               className="btn btn-secondary btn-small"
-              onClick={() => setVisibleCount((current) => Math.min(current + 10, rows.length, 200))}
+              onClick={() => setVisibleCount((current) => Math.min(current + loadStep, rows.length, maxRows))}
             >
-              查看更多 ({Math.min(10, rows.length - visibleCount)})
+              查看更多 ({Math.min(loadStep, rows.length - visibleCount)})
             </button>
           ) : (
-            <button className="btn btn-secondary btn-small" onClick={() => setVisibleCount(10)}>
+            <button className="btn btn-secondary btn-small" onClick={() => setVisibleCount(initialVisibleCount)}>
               收起
             </button>
           )}

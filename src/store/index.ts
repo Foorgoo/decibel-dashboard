@@ -17,6 +17,7 @@ export interface SubaccountAlias {
 type AliasStorage = Record<string, Record<string, string>>;
 
 const ALIAS_STORAGE_KEY = 'decibel_subaccount_aliases_mainnet';
+const GAS_STATION_ENABLED_KEY = 'decibel_gas_station_enabled_mainnet';
 
 const normalizeAddress = (address: string) => address.toLowerCase();
 
@@ -70,6 +71,8 @@ const flattenAliasStorage = (storage: AliasStorage) =>
 
 interface DashboardState {
   apiKey: string;
+  gasStationApiKey: string;
+  gasStationEnabled: boolean;
   accounts: ManagedAccount[];
   currentAccount: string | 'all' | null;
   
@@ -91,6 +94,8 @@ interface DashboardState {
   error: string | null;
   
   setApiKey: (key: string) => void;
+  setGasStationApiKey: (key: string) => void;
+  setGasStationEnabled: (enabled: boolean) => void;
   setAccounts: (accounts: ManagedAccount[]) => void;
   addAccount: (account: ManagedAccount) => void;
   removeAccount: (address: string) => void;
@@ -113,6 +118,8 @@ interface DashboardState {
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   apiKey: localStorage.getItem('decibel_api_key_mainnet') || '',
+  gasStationApiKey: localStorage.getItem('decibel_gas_station_api_key_mainnet') || '',
+  gasStationEnabled: localStorage.getItem(GAS_STATION_ENABLED_KEY) === 'true',
   accounts: (() => {
     try {
       return JSON.parse(localStorage.getItem('decibel_accounts') || '[]');
@@ -146,6 +153,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       localStorage.removeItem('decibel_api_key_mainnet');
     }
     set({ apiKey: key });
+  },
+  setGasStationApiKey: (key) => {
+    if (key) {
+      localStorage.setItem('decibel_gas_station_api_key_mainnet', key);
+    } else {
+      localStorage.removeItem('decibel_gas_station_api_key_mainnet');
+    }
+    set({ gasStationApiKey: key });
+  },
+  setGasStationEnabled: (enabled) => {
+    localStorage.setItem(GAS_STATION_ENABLED_KEY, enabled ? 'true' : 'false');
+    set({ gasStationEnabled: enabled });
   },
   setAccounts: (accounts) => {
     localStorage.setItem('decibel_accounts', JSON.stringify(accounts));

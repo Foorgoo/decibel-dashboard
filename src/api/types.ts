@@ -84,7 +84,9 @@ export interface Trade {
 
 export interface PortfolioDataPoint {
   timestamp: number;
-  value: number;
+  value?: number;
+  data_points?: number;
+  vault_equity?: number | null;
 }
 
 export interface Market {

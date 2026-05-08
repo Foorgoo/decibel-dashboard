@@ -31,19 +31,18 @@ const getLocalDateKey = () => {
   return `${year}-${month}-${day}`;
 };
 
-export const getMsUntilNextLocalMidnight = () => {
-  const now = new Date();
-  const nextMidnight = new Date(now);
-  nextMidnight.setHours(24, 0, 5, 0);
-  return Math.max(nextMidnight.getTime() - now.getTime(), 1000);
-};
-
 export const getAmpDailyDelta = (accountKey: string, currentAmps: number) => {
   if (typeof window === 'undefined') return null;
 
   const storageKey = `decibel_amp_baseline_${getLocalDateKey()}_${accountKey.toLowerCase()}`;
-  const storedBaseline = Number(localStorage.getItem(storageKey));
+  const rawBaseline = localStorage.getItem(storageKey);
 
+  if (rawBaseline === null) {
+    localStorage.setItem(storageKey, String(currentAmps));
+    return 0;
+  }
+
+  const storedBaseline = Number(rawBaseline);
   if (!Number.isFinite(storedBaseline)) {
     localStorage.setItem(storageKey, String(currentAmps));
     return 0;
@@ -79,30 +78,37 @@ export const sumAccountFields = (accounts: any[]) => {
   return aggregate;
 };
 
+export const normalizeTimestamp = (value: unknown) => {
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue) && numericValue > 0) {
+    if (numericValue > 1_000_000_000_000_000_000) {
+      return Math.floor(numericValue / 1_000_000);
+    }
+    if (numericValue > 1_000_000_000_000_000) {
+      return Math.floor(numericValue / 1000);
+    }
+    return numericValue < 10_000_000_000 ? numericValue * 1000 : numericValue;
+  }
+
+  const parsedValue = Date.parse(String(value || ''));
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
 export const aggregatePortfolioData = (seriesList: any[][]) => {
   const points = new Map<number, number>();
 
   seriesList.flat().forEach((point: any) => {
-    const timestamp = Number(point.timestamp);
-    if (!Number.isFinite(timestamp)) return;
+    const timestamp = normalizeTimestamp(pickFirst(point, ['timestamp', 'time', 'created_at', 'date']));
+    if (!timestamp) return;
 
-    const value = Number(point.data_points ?? point.value ?? 0);
+    const value = Number(pickFirst(point, ['data_points', 'value', 'account_value', 'pnl']) ?? 0);
+    if (!Number.isFinite(value)) return;
     points.set(timestamp, (points.get(timestamp) || 0) + value);
   });
 
   return Array.from(points.entries())
     .sort(([a], [b]) => a - b)
     .map(([timestamp, value]) => ({ timestamp, value }));
-};
-
-export const normalizeTimestamp = (value: unknown) => {
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue) && numericValue > 0) {
-    return numericValue < 10_000_000_000 ? numericValue * 1000 : numericValue;
-  }
-
-  const parsedValue = Date.parse(String(value || ''));
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
 };
 
 export const normalizeTradeSide = (trade: any) => {

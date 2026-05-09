@@ -57,7 +57,14 @@ const toNumericInput = (value: number, maxDecimals = 6) => {
   return Number(value.toFixed(maxDecimals)).toString();
 };
 
-const toPriceInput = (value: number, maxDecimals = 6) => (Number.isFinite(value) && value > 0 ? toNumericInput(value, maxDecimals) : '');
+const toPriceInput = (value: number, maxDecimals = 6) => {
+  if (!Number.isFinite(value) || value <= 0) return '';
+  const fixedValue = value.toFixed(maxDecimals);
+  const [integerPart, decimalPart = ''] = fixedValue.split('.');
+  if (maxDecimals <= 2) return `${integerPart}.${decimalPart.padEnd(2, '0').slice(0, 2)}`;
+  const trimmedDecimals = decimalPart.replace(/0+$/, '');
+  return `${integerPart}.${trimmedDecimals.padEnd(2, '0')}`;
+};
 
 const parseNumericInput = (value: string) => Number(value.replace(/,/g, '').trim());
 
@@ -205,26 +212,10 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
       )
     : parsedLimitPrice;
   const orderPrice = mode === 'limit' ? roundedLimitPrice : protectedPrice;
-  const roundedReferencePrice = marketConfig
-    ? roundPriceToTick(
-        referencePrice,
-        Number(marketConfig.tick_size || 0),
-        Number(marketConfig.px_decimals || 0),
-        draft.closeSide === 'BUY' ? 'up' : 'down',
-      )
-    : referencePrice;
-  const roundedDisplayReferencePrice = marketConfig
-    ? roundPriceToTick(
-        displayReferencePrice,
-        Number(marketConfig.tick_size || 0),
-        Number(marketConfig.px_decimals || 0),
-        draft.closeSide === 'BUY' ? 'up' : 'down',
-      )
-    : displayReferencePrice;
   const displayClosePrice = mode === 'limit'
     ? limitTouched
-      ? orderPrice
-      : roundedDisplayReferencePrice
+      ? parsedLimitPrice
+      : displayReferencePrice
     : fillEstimate.averagePrice > 0
       ? fillEstimate.averagePrice
       : orderPrice;
@@ -233,6 +224,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const pnlPercent = closeValue > 0 ? (selectedPnl / closeValue) * 100 : 0;
   const formattedCloseSize = formatMarketSize(closeSize, position, markets);
   const formattedClosePrice = formatMarketPrice(displayClosePrice, position, markets);
+  const closePriceSummary = mode === 'limit' ? limitPrice || '-' : formattedClosePrice;
   const formattedRoundedLimitPrice = formatMarketPrice(roundedLimitPrice, position, markets);
   const tokenSymbol = draft.marketName.split('-')[0].split('/')[0];
   const closeActionText = draft.side === 'long' ? '平多' : '平空';
@@ -305,15 +297,15 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   }, []);
 
   useEffect(() => {
-    if (limitTouched || limitSeededFromDepth || bestBid <= 0 || bestAsk <= 0 || roundedReferencePrice <= 0) return;
-    setLimitPrice(toPriceInput(roundedReferencePrice, priceInputDecimals));
+    if (limitTouched || limitSeededFromDepth || bestBid <= 0 || bestAsk <= 0 || referencePrice <= 0) return;
+    setLimitPrice(toPriceInput(referencePrice, priceInputDecimals));
     setDisplayReferencePrice(referencePrice);
     setLimitSeededFromDepth(true);
     requestAnimationFrame(() => {
       priceInputRef.current?.focus();
       priceInputRef.current?.select();
     });
-  }, [bestAsk, bestBid, limitSeededFromDepth, limitTouched, priceInputDecimals, referencePrice, roundedReferencePrice]);
+  }, [bestAsk, bestBid, limitSeededFromDepth, limitTouched, priceInputDecimals, referencePrice]);
 
   useEffect(() => {
     const input = mode === 'limit' ? priceInputRef.current : sizeInputRef.current;
@@ -330,16 +322,8 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   };
 
   const handleMidPriceClick = () => {
-    const roundedMidPrice = marketConfig
-      ? roundPriceToTick(
-          referencePrice,
-          Number(marketConfig.tick_size || 0),
-          Number(marketConfig.px_decimals || 0),
-          draft.closeSide === 'BUY' ? 'up' : 'down',
-        )
-      : referencePrice;
     setLimitTouched(true);
-    setLimitPrice(toPriceInput(roundedMidPrice, priceInputDecimals));
+    setLimitPrice(toPriceInput(referencePrice, priceInputDecimals));
   };
 
   const handleSubmit = async () => {
@@ -451,7 +435,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
               <strong className="mono">
                 {mode === 'market'
                   ? `${formattedCloseSize} ${tokenSymbol}`
-                  : displayClosePrice > 0 ? formattedClosePrice : '-'}
+                  : closePriceSummary}
               </strong>
             </div>
             <div>
@@ -557,7 +541,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
           </div>
 
           {mode === 'limit' && marketConfig && roundedLimitPrice !== parsedLimitPrice && (
-            <p className="settings-hint trade-inline-hint">提交价将按 tick size 调整为 <span className="mono">{formattedRoundedLimitPrice}</span>。</p>
+            <p className="settings-hint trade-inline-hint">提交价: <span className="mono">{formattedRoundedLimitPrice}</span></p>
           )}
           {mode === 'market' && marketDepth && !fillEstimate.complete && (
             <p className="settings-hint warning-text trade-inline-hint">当前盘口深度不足，可能只能部分成交。</p>

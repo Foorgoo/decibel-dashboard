@@ -3,22 +3,12 @@ import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { PositionPricePanel } from './PositionPricePanel';
 import { IS_TRADING_MODE } from '../config/appMode';
+import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
+import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
 
 const ClosePositionActions = lazy(() => import('../features/trading/ClosePositionActions').then((module) => ({
   default: module.ClosePositionActions,
 })));
-
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const NUMBER = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -62,12 +52,12 @@ const getPositionFunding = (pos: any) => {
   return Number.isFinite(funding) ? funding : null;
 };
 
-const normalizeCurrencyAmount = (value: number) => Math.abs(value) < 0.005 ? 0 : value;
-const formatSignedCurrency = (value: number) => {
-  const normalizedValue = normalizeCurrencyAmount(value);
-  return `${normalizedValue > 0 ? '+' : ''}${CURRENCY.format(normalizedValue)}`;
+const getFundingDisplayValue = (fundingCost: number) => -fundingCost;
+
+const formatPositionSize = (position: any, markets: any[]) => {
+  const size = Math.abs(Number(position.size || 0));
+  return formatMarketSize(size, position, markets);
 };
-const getFundingDisplayValue = (fundingCost: number) => normalizeCurrencyAmount(-fundingCost);
 
 type SortKey = 'market' | 'subaccount' | 'side' | 'size' | 'value' | 'entry' | 'mark' | 'pnl' | 'liq' | 'margin' | 'funding';
 type SortDirection = 'asc' | 'desc';
@@ -77,7 +67,7 @@ interface PositionsTableProps {
 }
 
 export function PositionsTable({ embedded = false }: PositionsTableProps) {
-  const { positions } = useDashboardStore();
+  const { positions, markets } = useDashboardStore();
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedPosition, setSelectedPosition] = useState<any | null>(null);
@@ -230,18 +220,18 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
                       {side.toUpperCase()}
                     </span>
                   </td>
-                  <td className="mono">{NUMBER.format(Math.abs(size))}</td>
-                  <td className="mono">{value > 0 ? CURRENCY.format(value) : '-'}</td>
-                  <td className="mono">{CURRENCY.format(entryPrice)}</td>
-                  <td className="mono">{markPrice > 0 ? CURRENCY.format(markPrice) : '-'}</td>
+                  <td className="mono">{formatPositionSize(pos, markets)}</td>
+                  <td className="mono">{value > 0 ? formatCurrency(value) : '-'}</td>
+                  <td className="mono">{entryPrice > 0 ? formatMarketPrice(entryPrice, pos, markets) : '-'}</td>
+                  <td className="mono">{markPrice > 0 ? formatMarketPrice(markPrice, pos, markets) : '-'}</td>
                   <td className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl >= 0 ? '+' : ''}{CURRENCY.format(pnl)}
+                    {formatSignedCurrency(pnl)}
                   </td>
-                  <td className="mono">{liqPrice > 0 ? CURRENCY.format(liqPrice) : '-'}</td>
+                  <td className="mono">{liqPrice > 0 ? formatMarketPrice(liqPrice, pos, markets) : '-'}</td>
                   <td className="mono">
                     {margin ? (
                       <span>
-                        {CURRENCY.format(margin)}
+                        {formatCurrency(margin)}
                         <span className="cell-subtext">{marginMode}{marginMode && leverage ? ' · ' : ''}{leverage ? `${leverage}x` : ''}</span>
                       </span>
                     ) : '-'}

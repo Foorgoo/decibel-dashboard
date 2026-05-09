@@ -1,19 +1,10 @@
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
-
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const NUMBER = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
+import { formatMarketSize } from '../utils/marketPrecision';
+import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
 
 interface ExposureRow {
+  market?: string;
   marketName: string;
   longValue: number;
   shortValue: number;
@@ -23,7 +14,7 @@ interface ExposureRow {
 }
 
 export function MarketExposure() {
-  const { positions } = useDashboardStore();
+  const { positions, markets } = useDashboardStore();
 
   const rows = Array.from(
     positions.reduce<Map<string, ExposureRow>>((map, position: any) => {
@@ -32,6 +23,7 @@ export function MarketExposure() {
       const value = Number(position.value || 0);
       const pnl = Number(position.pnl || 0);
       const existing = map.get(marketName) || {
+        market: position.market,
         marketName,
         longValue: 0,
         shortValue: 0,
@@ -79,12 +71,12 @@ export function MarketExposure() {
                 <td>
                   <MarketLabel marketName={row.marketName} />
                 </td>
-                <td className="mono">{row.longValue > 0 ? CURRENCY.format(row.longValue) : '-'}</td>
-                <td className="mono">{row.shortValue > 0 ? CURRENCY.format(row.shortValue) : '-'}</td>
-                <td className="mono">{CURRENCY.format(row.totalValue)}</td>
-                <td className="mono">{NUMBER.format(row.netSize)}</td>
+                <td className="mono">{row.longValue > 0 ? formatCurrency(row.longValue) : '-'}</td>
+                <td className="mono">{row.shortValue > 0 ? formatCurrency(row.shortValue) : '-'}</td>
+                <td className="mono">{formatCurrency(row.totalValue)}</td>
+                <td className="mono">{formatMarketSize(row.netSize, { market: row.market, market_name: row.marketName }, markets)}</td>
                 <td className={`mono ${row.pnl >= 0 ? 'positive' : 'negative'}`}>
-                  {row.pnl >= 0 ? '+' : ''}{CURRENCY.format(row.pnl)}
+                  {formatSignedCurrency(row.pnl)}
                 </td>
               </tr>
             ))}

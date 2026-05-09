@@ -1,18 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
-
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const NUMBER = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
+import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
+import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -71,7 +61,7 @@ const getSourceClassName = (source?: string) => {
 };
 
 export function TradesTable() {
-  const { currentAccount, trades } = useDashboardStore();
+  const { currentAccount, trades, markets } = useDashboardStore();
   const isMultiAccountMode = currentAccount === 'all';
   const initialVisibleCount = isMultiAccountMode ? 20 : 10;
   const loadStep = isMultiAccountMode ? 20 : 10;
@@ -151,12 +141,12 @@ export function TradesTable() {
                 <td>
                   <span className={getSourceClassName(source)}>{getSourceLabel(source)}</span>
                 </td>
-                <td className="mono">{NUMBER.format(Number(trade.size || 0))}</td>
-                <td className="mono">{Number(trade.price || 0) > 0 ? CURRENCY.format(Number(trade.price)) : '-'}</td>
-                <td className="mono">{value > 0 ? CURRENCY.format(value) : '-'}</td>
-                <td className="mono">{fee ? CURRENCY.format(fee) : '-'}</td>
+                <td className="mono">{formatMarketSize(trade.size, trade, markets)}</td>
+                <td className="mono">{Number(trade.price || 0) > 0 ? formatMarketPrice(trade.price, trade, markets) : '-'}</td>
+                <td className="mono">{value > 0 ? formatCurrency(value) : '-'}</td>
+                <td className="mono">{fee ? formatCurrency(fee) : '-'}</td>
                 <td className={`mono ${!hasRealizedPnl || realizedPnl >= 0 ? 'positive' : 'negative'}`}>
-                  {hasRealizedPnl ? `${realizedPnl > 0 ? '+' : ''}${CURRENCY.format(realizedPnl)}` : '-'}
+                  {hasRealizedPnl ? formatSignedCurrency(realizedPnl) : '-'}
                 </td>
               </tr>
             );

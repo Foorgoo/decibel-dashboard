@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { useDashboardStore } from '../store';
 import { normalizeTimestamp, pickFirst } from '../utils/dashboardData';
+import { formatCurrency, normalizeCurrencyAmount } from '../utils/numberFormat';
 
 const RANGES: { label: string; value: string }[] = [
   { label: '24小时', value: '24h' },
@@ -19,16 +20,10 @@ const RANGES: { label: string; value: string }[] = [
   { label: '全部', value: 'all' },
 ];
 
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
 const formatAxisCurrency = (value: number) => {
-  const absValue = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
+  const normalizedValue = normalizeCurrencyAmount(value);
+  const absValue = Math.abs(normalizedValue);
+  const sign = normalizedValue < 0 ? '-' : '';
 
   if (absValue >= 1_000_000) {
     return `${sign}$${(absValue / 1_000_000).toFixed(absValue >= 10_000_000 ? 0 : 1)}m`;
@@ -157,7 +152,7 @@ function CustomTooltip({
       </div>
       <div className="mono" style={{ color }}>
         <span className="text-secondary" style={{ marginRight: 6 }}>{valueLabel}</span>
-        {CURRENCY.format(payload[0].value)}
+        {formatCurrency(Number(payload[0].value || 0))}
       </div>
     </div>
   );

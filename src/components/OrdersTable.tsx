@@ -2,24 +2,12 @@ import { Suspense, lazy, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { IS_TRADING_MODE } from '../config/appMode';
+import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
+import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
 
 const CancelOrderAction = lazy(() => import('../features/trading/CancelOrderAction').then((module) => ({
   default: module.CancelOrderAction,
 })));
-
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const NUMBER = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 5,
-});
-
-const SIZE_FORMATTER_CACHE = new Map<number, Intl.NumberFormat>();
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -121,60 +109,9 @@ const getOrderSide = (order: any) => {
 
 const getOrderSize = (order: any) => Math.abs(Number(order.remaining_size || order.size || 0));
 
-const getIntegerString = (value: unknown) => {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue) || numericValue <= 0) return '';
-  return numericValue.toFixed(0);
-};
-
-const countTrailingZeros = (value: string) => {
-  const match = value.match(/0+$/);
-  return match ? match[0].length : 0;
-};
-
-const getMarketSizeDecimals = (market: any) => {
-  const sizeDecimals = Number(market?.sz_decimals);
-  const lotSize = getIntegerString(market?.lot_size);
-  if (!Number.isFinite(sizeDecimals) || sizeDecimals < 0 || !lotSize) return null;
-  return Math.max(0, sizeDecimals - countTrailingZeros(lotSize));
-};
-
-const getNativeSizeDecimals = (market: any) => {
-  const sizeDecimals = Number(market?.sz_decimals);
-  return Number.isFinite(sizeDecimals) && sizeDecimals >= 0 ? sizeDecimals : null;
-};
-
-const getSizeFormatter = (maximumFractionDigits: number) => {
-  const decimals = Math.min(Math.max(Math.floor(maximumFractionDigits), 0), 8);
-  const cachedFormatter = SIZE_FORMATTER_CACHE.get(decimals);
-  if (cachedFormatter) return cachedFormatter;
-
-  const formatter = new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: Math.min(2, decimals),
-    maximumFractionDigits: decimals,
-  });
-  SIZE_FORMATTER_CACHE.set(decimals, formatter);
-  return formatter;
-};
-
-const findOrderMarket = (order: any, markets: any[]) => markets.find((market) => (
-  market.market_addr === order.market
-    || market.market_name === order.market_name
-    || market.market_name === order.market
-));
-
-const isBtcMarket = (market: any, order: any) => {
-  const marketLabel = String(market?.market_name || order.market_name || order.market || '').toUpperCase();
-  return /(^|[^A-Z])BTC([^A-Z]|$)/.test(marketLabel);
-};
-
 const formatOrderSize = (order: any, markets: any[]) => {
   const size = Number(order.remaining_size || order.size || 0);
-  const market = findOrderMarket(order, markets);
-  const marketSizeDecimals = isBtcMarket(market, order)
-    ? getNativeSizeDecimals(market)
-    : getMarketSizeDecimals(market);
-  return marketSizeDecimals !== null ? getSizeFormatter(marketSizeDecimals).format(size) : NUMBER.format(size);
+  return formatMarketSize(size, order, markets);
 };
 
 const getOrderPnl = (order: any, positions: any[]) => {
@@ -351,12 +288,12 @@ export function OrdersTable({ embedded = false }: OrdersTableProps) {
                     </span>
                   </td>
                   <td className="mono">{formatOrderSize(order, markets)}</td>
-                  <td className="mono">{value > 0 ? CURRENCY.format(value) : '-'}</td>
+                  <td className="mono">{value > 0 ? formatCurrency(value) : '-'}</td>
                   <td className="mono">
-                    {Number(order.price || 0) > 0 ? CURRENCY.format(Number(order.price || 0)) : 'Market'}
+                    {Number(order.price || 0) > 0 ? formatMarketPrice(order.price, order, markets) : 'Market'}
                   </td>
                   <td className={`mono ${pnl === null ? 'text-muted' : pnl >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl === null ? '-' : `${pnl >= 0 ? '+' : ''}${CURRENCY.format(pnl)}`}
+                    {pnl === null ? '-' : formatSignedCurrency(pnl)}
                   </td>
                   <td>
                     {reduceOnly === null ? '-' : (

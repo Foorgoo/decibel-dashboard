@@ -10,18 +10,8 @@ import { formatTradingError, submitGasStationTransaction, submitOwnerFeePayerTra
 import { TRADING_REFRESH_EVENT, notifyTradingToast } from './events';
 import { useDetectedWalletAddress } from './walletAccount';
 import { normalizeAddress } from '../../utils/dashboardData';
-
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const NUMBER = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 6,
-});
+import { formatMarketPrice, formatMarketSize, getMarketPriceDecimals, getMarketSizeDecimals } from '../../utils/marketPrecision';
+import { formatCurrency, formatSignedCurrency } from '../../utils/numberFormat';
 
 const PERCENT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -67,7 +57,7 @@ const toNumericInput = (value: number, maxDecimals = 6) => {
   return Number(value.toFixed(maxDecimals)).toString();
 };
 
-const toPriceInput = (value: number) => (Number.isFinite(value) && value > 0 ? NUMBER.format(value) : '');
+const toPriceInput = (value: number, maxDecimals = 6) => (Number.isFinite(value) && value > 0 ? toNumericInput(value, maxDecimals) : '');
 
 const parseNumericInput = (value: string) => Number(value.replace(/,/g, '').trim());
 
@@ -153,10 +143,17 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const detectedWalletAddress = useDetectedWalletAddress(connected, wallet, walletAccount);
   const { apiKey, gasStationApiKey, gasStationEnabled, markets } = useDashboardStore();
   const draft = useMemo(() => createDraft(position, mode), [position, mode]);
-  const [limitPrice, setLimitPrice] = useState(toPriceInput(draft.limitPrice));
+  const marketConfig = useMemo(() => markets.find((market) => (
+    market.market_addr?.toLowerCase() === draft.market.toLowerCase()
+      || market.market_name === position.market_name
+      || market.market_name === String(position.market_name || '').replace('/', '-')
+  )), [draft.market, markets, position.market_name]);
+  const sizeInputDecimals = getMarketSizeDecimals(marketConfig, position) ?? 6;
+  const priceInputDecimals = getMarketPriceDecimals(marketConfig) ?? 6;
+  const [limitPrice, setLimitPrice] = useState(toPriceInput(draft.limitPrice, priceInputDecimals));
   const [limitTouched, setLimitTouched] = useState(false);
   const [limitSeededFromDepth, setLimitSeededFromDepth] = useState(false);
-  const [sizeInput, setSizeInput] = useState(toNumericInput(draft.size));
+  const [sizeInput, setSizeInput] = useState(toNumericInput(draft.size, sizeInputDecimals));
   const [slippagePercent, setSlippagePercent] = useState(String(draft.slippagePercent));
   const [postOnly, setPostOnly] = useState(draft.postOnly);
   const [marketDepth, setMarketDepth] = useState<MarketDepth | null>(null);
@@ -168,11 +165,6 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const latestReferencePriceRef = useRef(draft.markPrice);
   const hasDepthRef = useRef(false);
   const depthErrorCountRef = useRef(0);
-  const marketConfig = markets.find((market) => (
-    market.market_addr?.toLowerCase() === draft.market.toLowerCase()
-      || market.market_name === position.market_name
-      || market.market_name === String(position.market_name || '').replace('/', '-')
-  ));
   const bestBid = getBookPrice(marketDepth?.best_bid ? { price: marketDepth.best_bid, size: 0 } : marketDepth?.bids?.[0]);
   const bestAsk = getBookPrice(marketDepth?.best_ask ? { price: marketDepth.best_ask, size: 0 } : marketDepth?.asks?.[0]);
   const midPrice = bestBid > 0 && bestAsk > 0 ? (bestBid + bestAsk) / 2 : draft.markPrice;
@@ -239,6 +231,9 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const selectedPnl = getPositionPnl(position, displayClosePrice, closeSize, draft.size);
   const closeValue = closeSize * (displayClosePrice > 0 ? displayClosePrice : referencePrice);
   const pnlPercent = closeValue > 0 ? (selectedPnl / closeValue) * 100 : 0;
+  const formattedCloseSize = formatMarketSize(closeSize, position, markets);
+  const formattedClosePrice = formatMarketPrice(displayClosePrice, position, markets);
+  const formattedRoundedLimitPrice = formatMarketPrice(roundedLimitPrice, position, markets);
   const tokenSymbol = draft.marketName.split('-')[0].split('/')[0];
   const closeActionText = draft.side === 'long' ? '平多' : '平空';
   const effectiveGasStationKey = gasStationEnabled ? (gasStationApiKey || apiKey) : '';
@@ -311,14 +306,14 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
 
   useEffect(() => {
     if (limitTouched || limitSeededFromDepth || bestBid <= 0 || bestAsk <= 0 || roundedReferencePrice <= 0) return;
-    setLimitPrice(toPriceInput(roundedReferencePrice));
+    setLimitPrice(toPriceInput(roundedReferencePrice, priceInputDecimals));
     setDisplayReferencePrice(referencePrice);
     setLimitSeededFromDepth(true);
     requestAnimationFrame(() => {
       priceInputRef.current?.focus();
       priceInputRef.current?.select();
     });
-  }, [bestAsk, bestBid, limitSeededFromDepth, limitTouched, referencePrice, roundedReferencePrice]);
+  }, [bestAsk, bestBid, limitSeededFromDepth, limitTouched, priceInputDecimals, referencePrice, roundedReferencePrice]);
 
   useEffect(() => {
     const input = mode === 'limit' ? priceInputRef.current : sizeInputRef.current;
@@ -331,7 +326,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   }, [mode]);
 
   const handlePercentSelect = (percent: number) => {
-    setSizeInput(toNumericInput((draft.size * percent) / 100));
+    setSizeInput(toNumericInput((draft.size * percent) / 100, sizeInputDecimals));
   };
 
   const handleMidPriceClick = () => {
@@ -344,7 +339,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
         )
       : referencePrice;
     setLimitTouched(true);
-    setLimitPrice(toPriceInput(roundedMidPrice));
+    setLimitPrice(toPriceInput(roundedMidPrice, priceInputDecimals));
   };
 
   const handleSubmit = async () => {
@@ -455,14 +450,14 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
               <span>{mode === 'market' ? '数量' : '平仓价'}</span>
               <strong className="mono">
                 {mode === 'market'
-                  ? `${NUMBER.format(closeSize)} ${tokenSymbol}`
-                  : displayClosePrice > 0 ? NUMBER.format(displayClosePrice) : '-'}
+                  ? `${formattedCloseSize} ${tokenSymbol}`
+                  : displayClosePrice > 0 ? formattedClosePrice : '-'}
               </strong>
             </div>
             <div>
               <span>{mode === 'market' ? '价格' : '数量'}</span>
               <strong className="mono">
-                {mode === 'market' ? '市价' : `${NUMBER.format(closeSize)} ${tokenSymbol}`}
+                {mode === 'market' ? '市价' : `${formattedCloseSize} ${tokenSymbol}`}
               </strong>
             </div>
             <div>
@@ -470,12 +465,12 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
               <strong className="mono">
                 {mode === 'market'
                   ? marketDepth ? `${SLIPPAGE_PERCENT.format(estimatedSlippage)}%` : '0.0000%'
-                  : closeValue > 0 ? CURRENCY.format(closeValue) : '-'}
+                  : closeValue > 0 ? formatCurrency(closeValue) : '-'}
               </strong>
             </div>
             <div>
               <span>{mode === 'market' ? '预估盈亏' : '盈亏'}</span>
-              <strong className={selectedPnl >= 0 ? 'positive' : 'negative'}>{CURRENCY.format(selectedPnl)}</strong>
+              <strong className={selectedPnl >= 0 ? 'positive' : 'negative'}>{formatSignedCurrency(selectedPnl)}</strong>
             </div>
           </div>
 
@@ -522,7 +517,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
           </div>
 
           <div className={`trade-pnl-line ${selectedPnl >= 0 ? 'positive' : 'negative'}`}>
-            预估 {CURRENCY.format(selectedPnl)} / {PERCENT.format(pnlPercent)}% {selectedPnl >= 0 ? '盈利' : '亏损'}
+            预估 {formatSignedCurrency(selectedPnl)} / {PERCENT.format(pnlPercent)}% {selectedPnl >= 0 ? '盈利' : '亏损'}
           </div>
 
           <div className="trade-slider-wrap">
@@ -562,7 +557,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
           </div>
 
           {mode === 'limit' && marketConfig && roundedLimitPrice !== parsedLimitPrice && (
-            <p className="settings-hint trade-inline-hint">提交价将按 tick size 调整为 <span className="mono">{CURRENCY.format(roundedLimitPrice)}</span>。</p>
+            <p className="settings-hint trade-inline-hint">提交价将按 tick size 调整为 <span className="mono">{formattedRoundedLimitPrice}</span>。</p>
           )}
           {mode === 'market' && marketDepth && !fillEstimate.complete && (
             <p className="settings-hint warning-text trade-inline-hint">当前盘口深度不足，可能只能部分成交。</p>

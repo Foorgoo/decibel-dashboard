@@ -2,13 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { MarketLabel } from './MarketLabel';
 import { createDecibelClient } from '../api/client';
 import { useDashboardStore } from '../store';
-
-const CURRENCY = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+import { formatMarketPrice } from '../utils/marketPrecision';
+import { formatSignedCurrency } from '../utils/numberFormat';
 
 const INTERVALS = [
   { label: '15m', value: '15m', limit: 96, stepMs: 15 * 60 * 1000 },
@@ -63,12 +58,6 @@ const getLevelY = (level: number, min: number, max: number, height: number) => {
   return height - ((level - min) / range) * height;
 };
 
-const formatAxisPrice = (value: number) => {
-  if (Math.abs(value) >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (Math.abs(value) >= 1) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  return value.toLocaleString('en-US', { maximumFractionDigits: 5 });
-};
-
 const formatAxisTime = (timestamp: number, interval: IntervalValue) => {
   const date = new Date(timestamp);
   if (interval === '1d') {
@@ -90,7 +79,7 @@ const applyWheelZoom = (
 };
 
 export function PositionPricePanel({ position, onClose }: PositionPricePanelProps) {
-  const { apiKey } = useDashboardStore();
+  const { apiKey, markets } = useDashboardStore();
   const [interval, setIntervalValue] = useState<IntervalValue>('15m');
   const [priceZoom, setPriceZoom] = useState(1);
   const [timeZoom, setTimeZoom] = useState(1);
@@ -108,6 +97,7 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
   const pnl = Number(position.pnl || position.unrealized_pnl || 0);
   const side = size >= 0 ? 'LONG' : 'SHORT';
   const activeInterval = INTERVALS.find((item) => item.value === interval) || INTERVALS[1];
+  const formatPrice = (value: number) => formatMarketPrice(value, position, markets);
   const keyToUse = typeof window !== 'undefined'
     ? localStorage.getItem('decibel_api_key_mainnet') || apiKey
     : apiKey;
@@ -208,15 +198,15 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
         <div className="price-panel-stats">
           <div>
             <span>开仓价</span>
-            <strong className="mono">{entryPrice > 0 ? CURRENCY.format(entryPrice) : '-'}</strong>
+            <strong className="mono">{entryPrice > 0 ? formatPrice(entryPrice) : '-'}</strong>
           </div>
           <div>
             <span>现价</span>
-            <strong className="mono">{markPrice > 0 ? CURRENCY.format(markPrice) : '-'}</strong>
+            <strong className="mono">{markPrice > 0 ? formatPrice(markPrice) : '-'}</strong>
           </div>
           <div>
             <span>清算价</span>
-            <strong className="mono">{liqPrice > 0 ? CURRENCY.format(liqPrice) : '-'}</strong>
+            <strong className="mono">{liqPrice > 0 ? formatPrice(liqPrice) : '-'}</strong>
           </div>
           <div>
             <span>杠杆</span>
@@ -224,7 +214,7 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
           </div>
           <div>
             <span>未实现盈亏</span>
-            <strong className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>{pnl >= 0 ? '+' : ''}{CURRENCY.format(pnl)}</strong>
+            <strong className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>{formatSignedCurrency(pnl)}</strong>
           </div>
         </div>
 
@@ -279,7 +269,7 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
                 return (
                   <g key={level.label} className={`price-level price-level-${level.className}`}>
                     <line x1="0" x2={chart.width} y1={y} y2={y} />
-                    <text x={chart.width - 4} y={Math.max(12, y - 5)}>{level.label} {CURRENCY.format(level.value)}</text>
+                    <text x={chart.width - 4} y={Math.max(12, y - 5)}>{level.label} {formatPrice(level.value)}</text>
                   </g>
                 );
               })}
@@ -300,7 +290,7 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
                     key={`price-${tick.y}`}
                     style={{ top: `${(tick.y / chart.height) * 100}%` }}
                   >
-                    {formatAxisPrice(tick.value)}
+                    {formatPrice(tick.value)}
                   </span>
                 ))}
               </div>

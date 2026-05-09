@@ -139,6 +139,11 @@ const getMarketSizeDecimals = (market: any) => {
   return Math.max(0, sizeDecimals - countTrailingZeros(lotSize));
 };
 
+const getNativeSizeDecimals = (market: any) => {
+  const sizeDecimals = Number(market?.sz_decimals);
+  return Number.isFinite(sizeDecimals) && sizeDecimals >= 0 ? sizeDecimals : null;
+};
+
 const getSizeFormatter = (maximumFractionDigits: number) => {
   const decimals = Math.min(Math.max(Math.floor(maximumFractionDigits), 0), 8);
   const cachedFormatter = SIZE_FORMATTER_CACHE.get(decimals);
@@ -158,9 +163,17 @@ const findOrderMarket = (order: any, markets: any[]) => markets.find((market) =>
     || market.market_name === order.market
 ));
 
+const isBtcMarket = (market: any, order: any) => {
+  const marketLabel = String(market?.market_name || order.market_name || order.market || '').toUpperCase();
+  return /(^|[^A-Z])BTC([^A-Z]|$)/.test(marketLabel);
+};
+
 const formatOrderSize = (order: any, markets: any[]) => {
   const size = Number(order.remaining_size || order.size || 0);
-  const marketSizeDecimals = getMarketSizeDecimals(findOrderMarket(order, markets));
+  const market = findOrderMarket(order, markets);
+  const marketSizeDecimals = isBtcMarket(market, order)
+    ? getNativeSizeDecimals(market)
+    : getMarketSizeDecimals(market);
   return marketSizeDecimals !== null ? getSizeFormatter(marketSizeDecimals).format(size) : NUMBER.format(size);
 };
 

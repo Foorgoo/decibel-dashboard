@@ -41,4 +41,4 @@ jobs:
           REMOTE_PORT: ${{ secrets.VPS_PORT }}
           SOURCE: dist/
           TARGET: ${{ secrets.VPS_DEPLOY_PATH }}
-          ARGS: -rlgoDzvc --delete
+          ARGS: -rlgoDzvc

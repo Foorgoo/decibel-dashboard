@@ -18,7 +18,9 @@ const getFiniteNumber = (value: unknown) => {
   return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
-const getFundingDisplayValue = (fundingCost: number) => -fundingCost;
+const normalizeCurrencyAmount = (value: number) => Math.abs(value) < 0.005 ? 0 : value;
+const formatCurrencyAmount = (value: number) => CURRENCY.format(normalizeCurrencyAmount(value));
+const getFundingDisplayValue = (fundingCost: number) => normalizeCurrencyAmount(-fundingCost);
 
 export function EquityBreakdownChart() {
   const { account, currentAccount } = useDashboardStore();
@@ -96,7 +98,7 @@ export function EquityBreakdownChart() {
             <div key={row.label} className="equity-breakdown-row">
               <div className="equity-breakdown-row-head">
                 <span>{row.label}</span>
-                <strong className={`mono ${row.tone}`}>{row.value > 0 && row.tone !== 'neutral' ? '+' : ''}{CURRENCY.format(row.value)}</strong>
+                <strong className={`mono ${row.tone}`}>{row.value > 0 && row.tone !== 'neutral' ? '+' : ''}{formatCurrencyAmount(row.value)}</strong>
               </div>
               <div className="equity-breakdown-track">
                 <span

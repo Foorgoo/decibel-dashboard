@@ -62,8 +62,12 @@ const getPositionFunding = (pos: any) => {
   return Number.isFinite(funding) ? funding : null;
 };
 
-const formatSignedCurrency = (value: number) => `${value > 0 ? '+' : ''}${CURRENCY.format(value)}`;
-const getFundingDisplayValue = (fundingCost: number) => -fundingCost;
+const normalizeCurrencyAmount = (value: number) => Math.abs(value) < 0.005 ? 0 : value;
+const formatSignedCurrency = (value: number) => {
+  const normalizedValue = normalizeCurrencyAmount(value);
+  return `${normalizedValue > 0 ? '+' : ''}${CURRENCY.format(normalizedValue)}`;
+};
+const getFundingDisplayValue = (fundingCost: number) => normalizeCurrencyAmount(-fundingCost);
 
 type SortKey = 'market' | 'subaccount' | 'side' | 'size' | 'value' | 'entry' | 'mark' | 'pnl' | 'liq' | 'margin' | 'funding';
 type SortDirection = 'asc' | 'desc';

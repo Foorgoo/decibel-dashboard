@@ -9,6 +9,7 @@ import { DataTabs } from './components/DataTabs';
 import { ConfigModal } from './components/ConfigModal';
 import decibelMark from './assets/decibel-mark.svg';
 import { APP_MODE, IS_TRADING_MODE } from './config/appMode';
+import { TradingAuthorizationPanel } from './features/trading/TradingAuthorizationPanel';
 import {
   aggregatePortfolioData,
   getAmpDailyDelta,
@@ -31,9 +32,6 @@ import {
 } from './features/trading/events';
 
 const PnLChart = lazy(() => import('./components/PnLChart').then((module) => ({ default: module.PnLChart })));
-const TradingAuthorizationPanel = lazy(() => import('./features/trading/TradingAuthorizationPanel').then((module) => ({
-  default: module.TradingAuthorizationPanel,
-})));
 const TradingWalletStatus = lazy(() => import('./features/trading/TradingWalletStatus').then((module) => ({
   default: module.TradingWalletStatus,
 })));
@@ -1007,9 +1005,7 @@ function App() {
       {showTradingAuth && (
         <div className="modal-overlay" onClick={() => setShowTradingAuth(false)}>
           <div className="modal trading-auth-modal" onClick={(event) => event.stopPropagation()}>
-            <Suspense fallback={<div className="settings-hint">交易授权加载中...</div>}>
-              <TradingAuthorizationPanel onClose={() => setShowTradingAuth(false)} />
-            </Suspense>
+            <TradingAuthorizationPanel onClose={() => setShowTradingAuth(false)} />
           </div>
         </div>
       )}

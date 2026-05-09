@@ -16,8 +16,10 @@ const CURRENCY = new Intl.NumberFormat('en-US', {
 
 const NUMBER = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
+  maximumFractionDigits: 5,
 });
+
+const SIZE_FORMATTER_CACHE = new Map<number, Intl.NumberFormat>();
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -119,6 +121,49 @@ const getOrderSide = (order: any) => {
 
 const getOrderSize = (order: any) => Math.abs(Number(order.remaining_size || order.size || 0));
 
+const getIntegerString = (value: unknown) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return '';
+  return numericValue.toFixed(0);
+};
+
+const countTrailingZeros = (value: string) => {
+  const match = value.match(/0+$/);
+  return match ? match[0].length : 0;
+};
+
+const getMarketSizeDecimals = (market: any) => {
+  const sizeDecimals = Number(market?.sz_decimals);
+  const lotSize = getIntegerString(market?.lot_size);
+  if (!Number.isFinite(sizeDecimals) || sizeDecimals < 0 || !lotSize) return null;
+  return Math.max(0, sizeDecimals - countTrailingZeros(lotSize));
+};
+
+const getSizeFormatter = (maximumFractionDigits: number) => {
+  const decimals = Math.min(Math.max(Math.floor(maximumFractionDigits), 0), 8);
+  const cachedFormatter = SIZE_FORMATTER_CACHE.get(decimals);
+  if (cachedFormatter) return cachedFormatter;
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: Math.min(2, decimals),
+    maximumFractionDigits: decimals,
+  });
+  SIZE_FORMATTER_CACHE.set(decimals, formatter);
+  return formatter;
+};
+
+const findOrderMarket = (order: any, markets: any[]) => markets.find((market) => (
+  market.market_addr === order.market
+    || market.market_name === order.market_name
+    || market.market_name === order.market
+));
+
+const formatOrderSize = (order: any, markets: any[]) => {
+  const size = Number(order.remaining_size || order.size || 0);
+  const marketSizeDecimals = getMarketSizeDecimals(findOrderMarket(order, markets));
+  return marketSizeDecimals !== null ? getSizeFormatter(marketSizeDecimals).format(size) : NUMBER.format(size);
+};
+
 const getOrderPnl = (order: any, positions: any[]) => {
   const orderPrice = Number(order.price || 0);
   const orderSize = getOrderSize(order);
@@ -154,7 +199,7 @@ interface OrdersTableProps {
 }
 
 export function OrdersTable({ embedded = false }: OrdersTableProps) {
-  const { openOrders, positions } = useDashboardStore();
+  const { openOrders, positions, markets } = useDashboardStore();
   const [sortKey, setSortKey] = useState<SortKey>('time');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -292,7 +337,7 @@ export function OrdersTable({ embedded = false }: OrdersTableProps) {
                       {orderSide.label}
                     </span>
                   </td>
-                  <td className="mono">{NUMBER.format(Number(order.remaining_size || order.size || 0))}</td>
+                  <td className="mono">{formatOrderSize(order, markets)}</td>
                   <td className="mono">{value > 0 ? CURRENCY.format(value) : '-'}</td>
                   <td className="mono">
                     {Number(order.price || 0) > 0 ? CURRENCY.format(Number(order.price || 0)) : 'Market'}

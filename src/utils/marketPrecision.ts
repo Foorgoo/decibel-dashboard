@@ -51,7 +51,7 @@ export const getMarketPriceDecimals = (market: Market | undefined) => {
   const priceDecimals = Number(market?.px_decimals);
   const tickSize = getIntegerString(market?.tick_size);
   if (!Number.isFinite(priceDecimals) || priceDecimals < 0 || !tickSize) return null;
-  return Math.max(0, priceDecimals - countTrailingZeros(tickSize));
+  return Math.max(DEFAULT_PRICE_DECIMALS, priceDecimals - countTrailingZeros(tickSize));
 };
 
 const getNumberFormatter = (

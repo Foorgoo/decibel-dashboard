@@ -541,7 +541,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
           </div>
 
           {mode === 'limit' && marketConfig && roundedLimitPrice !== parsedLimitPrice && (
-            <p className="settings-hint trade-inline-hint">提交价: <span className="mono">{formattedRoundedLimitPrice}</span></p>
+            <p className="settings-hint warning-text trade-inline-hint">实际提交价：<span className="mono">{formattedRoundedLimitPrice}</span></p>
           )}
           {mode === 'market' && marketDepth && !fillEstimate.complete && (
             <p className="settings-hint warning-text trade-inline-hint">当前盘口深度不足，可能只能部分成交。</p>

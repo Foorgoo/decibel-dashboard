@@ -35,7 +35,7 @@ const PnLChart = lazy(() => import('./components/PnLChart').then((module) => ({ 
 const TradingWalletStatus = lazy(() => import('./features/trading/TradingWalletStatus').then((module) => ({
   default: module.TradingWalletStatus,
 })));
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.2.1';
 const CURRENT_YEAR = new Date().getFullYear();
 type TradingToast = TradingToastDetail & { id: number };
 type CachedSubaccount = { account: string; name?: string; isPrimary?: boolean };

@@ -66,6 +66,8 @@ const toPriceInput = (value: number, maxDecimals = 6) => {
   return `${integerPart}.${trimmedDecimals.padEnd(2, '0')}`;
 };
 
+const toEditableNumber = (value: string) => value.replace(/,/g, '');
+
 const parseNumericInput = (value: string) => Number(value.replace(/,/g, '').trim());
 
 const roundPriceToTick = (
@@ -158,6 +160,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const sizeInputDecimals = getMarketSizeDecimals(marketConfig, position) ?? 6;
   const priceInputDecimals = getMarketPriceDecimals(marketConfig) ?? 6;
   const [limitPrice, setLimitPrice] = useState(toPriceInput(draft.limitPrice, priceInputDecimals));
+  const [priceEditing, setPriceEditing] = useState(false);
   const [limitTouched, setLimitTouched] = useState(false);
   const [limitSeededFromDepth, setLimitSeededFromDepth] = useState(false);
   const [sizeInput, setSizeInput] = useState(toNumericInput(draft.size, sizeInputDecimals));
@@ -224,7 +227,10 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const pnlPercent = closeValue > 0 ? (selectedPnl / closeValue) * 100 : 0;
   const formattedCloseSize = formatMarketSize(closeSize, position, markets);
   const formattedClosePrice = formatMarketPrice(displayClosePrice, position, markets);
-  const closePriceSummary = mode === 'limit' ? limitPrice || '-' : formattedClosePrice;
+  const formattedLimitPrice = Number.isFinite(parsedLimitPrice) && parsedLimitPrice > 0
+    ? formatMarketPrice(parsedLimitPrice, position, markets)
+    : '-';
+  const closePriceSummary = mode === 'limit' ? formattedLimitPrice : formattedClosePrice;
   const tokenSymbol = draft.marketName.split('-')[0].split('/')[0];
   const closeActionText = draft.side === 'long' ? '平多' : '平空';
   const effectiveGasStationKey = gasStationEnabled ? (gasStationApiKey || apiKey) : '';
@@ -464,10 +470,15 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
                 <input
                   id="close-limit-price"
                   ref={priceInputRef}
-                  value={limitPrice}
+                  value={priceEditing ? toEditableNumber(limitPrice) : formattedLimitPrice}
                   onChange={(event) => {
                     setLimitTouched(true);
                     setLimitPrice(event.target.value);
+                  }}
+                  onFocus={() => setPriceEditing(true)}
+                  onBlur={() => {
+                    setPriceEditing(false);
+                    setLimitPrice(toPriceInput(parseNumericInput(limitPrice), priceInputDecimals));
                   }}
                   inputMode="decimal"
                 />

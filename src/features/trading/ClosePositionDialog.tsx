@@ -180,6 +180,8 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const midPrice = bestBid > 0 && bestAsk > 0 ? (bestBid + bestAsk) / 2 : draft.markPrice;
   const referencePrice = midPrice > 0 ? midPrice : draft.markPrice;
   const parsedLimitPrice = parseNumericInput(limitPrice);
+  const liveLimitPrice = displayReferencePrice > 0 ? displayReferencePrice : referencePrice;
+  const effectiveLimitPrice = limitTouched ? parsedLimitPrice : liveLimitPrice;
   const parsedSize = parseNumericInput(sizeInput);
   const closeSize = Number.isFinite(parsedSize) ? Math.min(Math.max(parsedSize, 0), draft.size) : 0;
   const closePercent = draft.size > 0 ? Math.min(100, Math.max(0, (closeSize / draft.size) * 100)) : 0;
@@ -208,17 +210,15 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
     : rawProtectedPrice;
   const roundedLimitPrice = marketConfig
     ? roundPriceToTick(
-        parsedLimitPrice,
+        effectiveLimitPrice,
         Number(marketConfig.tick_size || 0),
         Number(marketConfig.px_decimals || 0),
         draft.closeSide === 'BUY' ? 'up' : 'down',
       )
-    : parsedLimitPrice;
+    : effectiveLimitPrice;
   const orderPrice = mode === 'limit' ? roundedLimitPrice : protectedPrice;
   const displayClosePrice = mode === 'limit'
-    ? limitTouched
-      ? parsedLimitPrice
-      : displayReferencePrice
+    ? effectiveLimitPrice
     : fillEstimate.averagePrice > 0
       ? fillEstimate.averagePrice
       : orderPrice;
@@ -227,8 +227,8 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const pnlPercent = closeValue > 0 ? (selectedPnl / closeValue) * 100 : 0;
   const formattedCloseSize = formatMarketSize(closeSize, position, markets);
   const formattedClosePrice = formatMarketPrice(displayClosePrice, position, markets);
-  const formattedLimitPrice = Number.isFinite(parsedLimitPrice) && parsedLimitPrice > 0
-    ? formatMarketPrice(parsedLimitPrice, position, markets)
+  const formattedLimitPrice = Number.isFinite(effectiveLimitPrice) && effectiveLimitPrice > 0
+    ? formatMarketPrice(effectiveLimitPrice, position, markets)
     : '-';
   const closePriceSummary = mode === 'limit' ? formattedLimitPrice : formattedClosePrice;
   const tokenSymbol = draft.marketName.split('-')[0].split('/')[0];
@@ -470,7 +470,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
                 <input
                   id="close-limit-price"
                   ref={priceInputRef}
-                  value={priceEditing ? toEditableNumber(limitPrice) : formattedLimitPrice}
+                  value={priceEditing && limitTouched ? toEditableNumber(limitPrice) : formattedLimitPrice}
                   onChange={(event) => {
                     setLimitTouched(true);
                     setLimitPrice(event.target.value);
@@ -478,7 +478,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
                   onFocus={() => setPriceEditing(true)}
                   onBlur={() => {
                     setPriceEditing(false);
-                    setLimitPrice(toPriceInput(parseNumericInput(limitPrice), priceInputDecimals));
+                    setLimitPrice(toPriceInput(effectiveLimitPrice, priceInputDecimals));
                   }}
                   inputMode="decimal"
                 />

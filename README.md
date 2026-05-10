@@ -18,6 +18,8 @@ Decibel Dashboard 是一个面向 Decibel 主网账户的交易看板，用于�
 - 默认使用 `trading` 交易版模式，也保留 `dashboard` 纯看板构建模式
 - `trading` 模式支持钱包连接、Session Key 授权、Gas Station 或 Owner 付 gas、限价/市价平仓和撤单
 
+![Preview](./public/preview.png)
+
 ## 使用方式
 
 安装依赖：

@@ -4,7 +4,7 @@ import { MarketLabel } from './MarketLabel';
 import { PositionPricePanel } from './PositionPricePanel';
 import { IS_TRADING_MODE } from '../config/appMode';
 import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
-import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
+import { formatCurrency, formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
 
 const ClosePositionActions = lazy(() => import('../features/trading/ClosePositionActions').then((module) => ({
   default: module.ClosePositionActions,
@@ -221,7 +221,7 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
                     </span>
                   </td>
                   <td className="mono">{formatPositionSize(pos, markets)}</td>
-                  <td className="mono">{value > 0 ? formatCurrency(value) : '-'}</td>
+                  <td className="mono">{value > 0 ? formatNumberAmount(value) : '-'}</td>
                   <td className="mono">{entryPrice > 0 ? formatMarketPrice(entryPrice, pos, markets) : '-'}</td>
                   <td className="mono">{markPrice > 0 ? formatMarketPrice(markPrice, pos, markets) : '-'}</td>
                   <td className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>

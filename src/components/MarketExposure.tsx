@@ -1,7 +1,7 @@
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { formatMarketSize } from '../utils/marketPrecision';
-import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
+import { formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
 
 interface ExposureRow {
   market?: string;
@@ -71,9 +71,9 @@ export function MarketExposure() {
                 <td>
                   <MarketLabel marketName={row.marketName} />
                 </td>
-                <td className="mono">{row.longValue > 0 ? formatCurrency(row.longValue) : '-'}</td>
-                <td className="mono">{row.shortValue > 0 ? formatCurrency(row.shortValue) : '-'}</td>
-                <td className="mono">{formatCurrency(row.totalValue)}</td>
+                <td className="mono">{row.longValue > 0 ? formatNumberAmount(row.longValue) : '-'}</td>
+                <td className="mono">{row.shortValue > 0 ? formatNumberAmount(row.shortValue) : '-'}</td>
+                <td className="mono">{formatNumberAmount(row.totalValue)}</td>
                 <td className="mono">{formatMarketSize(row.netSize, { market: row.market, market_name: row.marketName }, markets)}</td>
                 <td className={`mono ${row.pnl >= 0 ? 'positive' : 'negative'}`}>
                   {formatSignedCurrency(row.pnl)}

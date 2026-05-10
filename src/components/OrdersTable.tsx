@@ -3,7 +3,7 @@ import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { IS_TRADING_MODE } from '../config/appMode';
 import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
-import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
+import { formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
 
 const CancelOrderAction = lazy(() => import('../features/trading/CancelOrderAction').then((module) => ({
   default: module.CancelOrderAction,
@@ -288,7 +288,7 @@ export function OrdersTable({ embedded = false }: OrdersTableProps) {
                     </span>
                   </td>
                   <td className="mono">{formatOrderSize(order, markets)}</td>
-                  <td className="mono">{value > 0 ? formatCurrency(value) : '-'}</td>
+                  <td className="mono">{value > 0 ? formatNumberAmount(value) : '-'}</td>
                   <td className="mono">
                     {Number(order.price || 0) > 0 ? formatMarketPrice(order.price, order, markets) : 'Market'}
                   </td>

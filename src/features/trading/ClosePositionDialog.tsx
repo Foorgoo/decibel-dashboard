@@ -11,7 +11,7 @@ import { TRADING_REFRESH_EVENT, notifyTradingToast } from './events';
 import { useDetectedWalletAddress } from './walletAccount';
 import { normalizeAddress } from '../../utils/dashboardData';
 import { formatMarketPrice, formatMarketSize, getMarketPriceDecimals, getMarketSizeDecimals } from '../../utils/marketPrecision';
-import { formatCurrency, formatSignedCurrency } from '../../utils/numberFormat';
+import { formatNumberAmount, formatSignedCurrency } from '../../utils/numberFormat';
 
 const PERCENT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -225,7 +225,6 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const formattedCloseSize = formatMarketSize(closeSize, position, markets);
   const formattedClosePrice = formatMarketPrice(displayClosePrice, position, markets);
   const closePriceSummary = mode === 'limit' ? limitPrice || '-' : formattedClosePrice;
-  const formattedRoundedLimitPrice = formatMarketPrice(roundedLimitPrice, position, markets);
   const tokenSymbol = draft.marketName.split('-')[0].split('/')[0];
   const closeActionText = draft.side === 'long' ? '平多' : '平空';
   const effectiveGasStationKey = gasStationEnabled ? (gasStationApiKey || apiKey) : '';
@@ -449,7 +448,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
               <strong className="mono">
                 {mode === 'market'
                   ? marketDepth ? `${SLIPPAGE_PERCENT.format(estimatedSlippage)}%` : '0.0000%'
-                  : closeValue > 0 ? formatCurrency(closeValue) : '-'}
+                  : closeValue > 0 ? formatNumberAmount(closeValue) : '-'}
               </strong>
             </div>
             <div>
@@ -540,9 +539,6 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
             </label>
           </div>
 
-          {mode === 'limit' && marketConfig && roundedLimitPrice !== parsedLimitPrice && (
-            <p className="settings-hint warning-text trade-inline-hint">实际提交价：<span className="mono">{formattedRoundedLimitPrice}</span></p>
-          )}
           {mode === 'market' && marketDepth && !fillEstimate.complete && (
             <p className="settings-hint warning-text trade-inline-hint">当前盘口深度不足，可能只能部分成交。</p>
           )}

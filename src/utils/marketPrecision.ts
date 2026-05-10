@@ -86,6 +86,15 @@ export const formatMarketSize = (
   return getNumberFormatter(SIZE_FORMATTER_CACHE, marketSizeDecimals ?? DEFAULT_SIZE_DECIMALS, MAX_SIZE_DECIMALS).format(displayValue);
 };
 
+const getMarketPriceFormatter = (market: Market | undefined) => {
+  const marketPriceDecimals = getMarketPriceDecimals(market);
+  return getNumberFormatter(
+    PRICE_FORMATTER_CACHE,
+    marketPriceDecimals ?? DEFAULT_PRICE_DECIMALS,
+    MAX_PRICE_DECIMALS,
+  );
+};
+
 export const formatMarketPrice = (
   value: unknown,
   ref: MarketRef,
@@ -93,11 +102,5 @@ export const formatMarketPrice = (
 ) => {
   const numericValue = Number(value || 0);
   const market = findMarketConfig(ref, markets);
-  const marketPriceDecimals = getMarketPriceDecimals(market);
-  return getNumberFormatter(
-    PRICE_FORMATTER_CACHE,
-    marketPriceDecimals ?? DEFAULT_PRICE_DECIMALS,
-    MAX_PRICE_DECIMALS,
-    { style: 'currency', currency: 'USD' },
-  ).format(numericValue);
+  return getMarketPriceFormatter(market).format(numericValue);
 };

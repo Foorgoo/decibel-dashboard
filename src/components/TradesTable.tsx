@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
-import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
+import { formatCurrency, formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -143,7 +143,7 @@ export function TradesTable() {
                 </td>
                 <td className="mono">{formatMarketSize(trade.size, trade, markets)}</td>
                 <td className="mono">{Number(trade.price || 0) > 0 ? formatMarketPrice(trade.price, trade, markets) : '-'}</td>
-                <td className="mono">{value > 0 ? formatCurrency(value) : '-'}</td>
+                <td className="mono">{value > 0 ? formatNumberAmount(value) : '-'}</td>
                 <td className="mono">{fee ? formatCurrency(fee) : '-'}</td>
                 <td className={`mono ${!hasRealizedPnl || realizedPnl >= 0 ? 'positive' : 'negative'}`}>
                   {hasRealizedPnl ? formatSignedCurrency(realizedPnl) : '-'}

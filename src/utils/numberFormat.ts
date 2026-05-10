@@ -23,6 +23,12 @@ export const normalizeCurrencyAmount = (value: number) => (
   Math.abs(value) < ZERO_CURRENCY_THRESHOLD ? 0 : value
 );
 
+export const formatNumberAmount = (value: number) => CURRENCY_FORMATTER.formatToParts(normalizeCurrencyAmount(value))
+  .filter((part) => part.type !== 'currency')
+  .map((part) => part.value)
+  .join('')
+  .trim();
+
 export const formatCurrency = (value: number) => CURRENCY_FORMATTER.format(normalizeCurrencyAmount(value));
 
 export const formatSignedCurrency = (value: number) => {

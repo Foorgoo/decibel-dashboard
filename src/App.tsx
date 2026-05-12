@@ -39,6 +39,8 @@ const TradingWalletStatus = lazy(() => import('./features/trading/TradingWalletS
 const APP_VERSION = '0.2.1';
 const CURRENT_YEAR = new Date().getFullYear();
 const TRADE_NOTIFY_MODE_KEY = 'decibel_trade_notify_mode_mainnet';
+const TRADE_NOTIFY_SOUND_KEY = 'decibel_trade_notify_sound_mainnet';
+const TRADE_NOTIFY_AUDIO_URL = '/sounds/trade-alert.mp3';
 type TradingToast = TradingToastDetail & { id: number };
 type TradeNotifyMode = 'off' | 'key' | 'all';
 type CachedSubaccount = { account: string; name?: string; isPrimary?: boolean };
@@ -78,6 +80,73 @@ const getTradeNotifyMode = (): TradeNotifyMode => {
   if (typeof window === 'undefined') return 'key';
   const value = localStorage.getItem(TRADE_NOTIFY_MODE_KEY);
   return value === 'off' || value === 'all' || value === 'key' ? value : 'key';
+};
+
+const getTradeNotifySoundEnabled = () => {
+  if (typeof window === 'undefined') return true;
+  const value = localStorage.getItem(TRADE_NOTIFY_SOUND_KEY);
+  return value === null ? true : value === 'true';
+};
+
+let tradeNotifyAudio: HTMLAudioElement | null = null;
+
+const playSynthFallbackSound = () => {
+  if (typeof window === 'undefined') return;
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextClass) return;
+  const context = new AudioContextClass();
+  const masterGain = context.createGain();
+  masterGain.gain.setValueAtTime(0.115, context.currentTime);
+  masterGain.connect(context.destination);
+
+  const playLayer = (
+    startAt: number,
+    frequency: number,
+    duration: number,
+    peak = 0.5,
+    type: OscillatorType = 'triangle',
+  ) => {
+    const osc = context.createOscillator();
+    const gain = context.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, startAt);
+    osc.frequency.exponentialRampToValueAtTime(frequency * 1.025, startAt + duration);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    osc.start(startAt);
+    osc.stop(startAt + duration + 0.02);
+  };
+
+  const start = context.currentTime;
+  // pulse-like alert: short lead tone + bright main tone + soft tail
+  playLayer(start, 740, 0.08, 0.42, 'square');
+  playLayer(start + 0.07, 1046, 0.14, 0.58, 'triangle');
+  playLayer(start + 0.07, 1568, 0.11, 0.22, 'sine');
+  playLayer(start + 0.2, 1318, 0.12, 0.34, 'sine');
+
+  window.setTimeout(() => {
+    context.close().catch(() => undefined);
+  }, 520);
+};
+
+const playTradeReminderSound = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!tradeNotifyAudio) {
+      tradeNotifyAudio = new Audio(TRADE_NOTIFY_AUDIO_URL);
+      tradeNotifyAudio.preload = 'auto';
+    }
+    tradeNotifyAudio.currentTime = 0;
+    tradeNotifyAudio.volume = 1;
+    tradeNotifyAudio.play().catch(() => {
+      playSynthFallbackSound();
+    });
+  } catch {
+    playSynthFallbackSound();
+  }
 };
 
 const getTradeIdentity = (trade: any) => (
@@ -156,6 +225,7 @@ function App() {
   const [tradesLoading, setTradesLoading] = useState(false);
   const [tradingToasts, setTradingToasts] = useState<TradingToast[]>([]);
   const [tradeNotifyMode, setTradeNotifyMode] = useState<TradeNotifyMode>(getTradeNotifyMode);
+  const [tradeNotifySoundEnabled, setTradeNotifySoundEnabled] = useState<boolean>(getTradeNotifySoundEnabled);
   const lastFetchRef = useRef(0);
   const activeRequestIdRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
@@ -858,6 +928,10 @@ function App() {
     const handleTradingToast = (event: Event) => {
       const detail = (event as CustomEvent<TradingToastDetail>).detail;
       if (!detail) return;
+      const isTradeReminder = detail.title.startsWith('成交提醒');
+      if (isTradeReminder && tradeNotifySoundEnabled) {
+        playTradeReminderSound();
+      }
 
       const id = Date.now() + Math.random();
       setTradingToasts((current) => [...current.slice(-2), { ...detail, id }]);
@@ -868,7 +942,7 @@ function App() {
 
     window.addEventListener(TRADING_TOAST_EVENT, handleTradingToast);
     return () => window.removeEventListener(TRADING_TOAST_EVENT, handleTradingToast);
-  }, []);
+  }, [tradeNotifySoundEnabled]);
 
   useEffect(() => {
     const handleTradingAuth = () => setShowTradingAuth(true);
@@ -1135,6 +1209,14 @@ function App() {
           onTradeNotifyModeChange={(mode) => {
             setTradeNotifyMode(mode);
             localStorage.setItem(TRADE_NOTIFY_MODE_KEY, mode);
+          }}
+          tradeNotifySoundEnabled={tradeNotifySoundEnabled}
+          onTradeNotifySoundEnabledChange={(enabled) => {
+            setTradeNotifySoundEnabled(enabled);
+            localStorage.setItem(TRADE_NOTIFY_SOUND_KEY, enabled ? 'true' : 'false');
+            if (enabled) {
+              playTradeReminderSound();
+            }
           }}
         />
       )}

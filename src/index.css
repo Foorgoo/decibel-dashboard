@@ -1269,6 +1269,10 @@ body {
   color: var(--success);
 }
 
+.settings-switch.muted {
+  opacity: 0.55;
+}
+
 .settings-switch input {
   appearance: none;
   width: 26px;
@@ -1301,6 +1305,10 @@ body {
 .settings-switch input:checked::after {
   transform: translateX(12px);
   background: var(--success);
+}
+
+.settings-switch input:disabled {
+  cursor: not-allowed;
 }
 
 .settings-link {

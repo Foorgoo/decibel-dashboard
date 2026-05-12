@@ -14,6 +14,8 @@ interface ConfigModalProps {
   onUpdateSubaccountAlias?: (address: string, alias: string) => void;
   tradeNotifyMode?: 'off' | 'key' | 'all';
   onTradeNotifyModeChange?: (mode: 'off' | 'key' | 'all') => void;
+  tradeNotifySoundEnabled?: boolean;
+  onTradeNotifySoundEnabledChange?: (enabled: boolean) => void;
 }
 
 const maskKey = (key: string) => {
@@ -44,6 +46,7 @@ const getLocalConfig = () => ({
   current_account: localStorage.getItem('decibel_current_account') || null,
   gas_station_enabled: localStorage.getItem('decibel_gas_station_enabled_mainnet') === 'true',
   trade_notify_mode: localStorage.getItem('decibel_trade_notify_mode_mainnet') || 'key',
+  trade_notify_sound_enabled: localStorage.getItem('decibel_trade_notify_sound_mainnet') !== 'false',
   subaccount_aliases: readJsonStorage('decibel_subaccount_aliases_mainnet', {}),
 });
 
@@ -129,6 +132,8 @@ export function ConfigModal({
   onUpdateSubaccountAlias,
   tradeNotifyMode = 'key',
   onTradeNotifyModeChange,
+  tradeNotifySoundEnabled = true,
+  onTradeNotifySoundEnabledChange,
 }: ConfigModalProps) {
   const storedMainnetKey = typeof window !== 'undefined' ? localStorage.getItem('decibel_api_key_mainnet') || '' : '';
   const storedGasStationKey = typeof window !== 'undefined' ? localStorage.getItem('decibel_gas_station_api_key_mainnet') || '' : '';
@@ -256,6 +261,10 @@ export function ConfigModal({
       if (config.trade_notify_mode === 'off' || config.trade_notify_mode === 'key' || config.trade_notify_mode === 'all') {
         localStorage.setItem('decibel_trade_notify_mode_mainnet', config.trade_notify_mode);
         onTradeNotifyModeChange?.(config.trade_notify_mode);
+      }
+      if (typeof config.trade_notify_sound_enabled === 'boolean') {
+        localStorage.setItem('decibel_trade_notify_sound_mainnet', config.trade_notify_sound_enabled ? 'true' : 'false');
+        onTradeNotifySoundEnabledChange?.(config.trade_notify_sound_enabled);
       }
 
       setConfigMessage({ type: 'success', text: '配置已导入，页面将刷新以应用变更' });
@@ -535,6 +544,20 @@ export function ConfigModal({
                         <option value="all">全部成交提醒</option>
                       </select>
                     </div>
+                    <label className={`settings-switch ${tradeNotifySoundEnabled ? 'enabled' : 'disabled'} ${tradeNotifyMode === 'off' ? 'muted' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={tradeNotifySoundEnabled}
+                        disabled={tradeNotifyMode === 'off'}
+                        onChange={(event) => onTradeNotifySoundEnabledChange?.(event.target.checked)}
+                      />
+                      <span>{tradeNotifySoundEnabled ? '声音开' : '声音关'}</span>
+                    </label>
+                  </div>
+                  <div className="settings-hint settings-hint-compact">
+                    {tradeNotifyMode === 'off'
+                      ? '提醒已关闭，声音开关暂停生效。'
+                      : '仅成交提醒播放短音，默认开启。'}
                   </div>
                 </div>
               )}

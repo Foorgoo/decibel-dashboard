@@ -28,6 +28,7 @@ import {
   TRADING_CONFIG_EVENT,
   TRADING_REFRESH_EVENT,
   TRADING_TOAST_EVENT,
+  notifyTradingToast,
   type TradingToastDetail,
 } from './features/trading/events';
 
@@ -37,7 +38,9 @@ const TradingWalletStatus = lazy(() => import('./features/trading/TradingWalletS
 })));
 const APP_VERSION = '0.2.1';
 const CURRENT_YEAR = new Date().getFullYear();
+const TRADE_NOTIFY_MODE_KEY = 'decibel_trade_notify_mode_mainnet';
 type TradingToast = TradingToastDetail & { id: number };
+type TradeNotifyMode = 'off' | 'key' | 'all';
 type CachedSubaccount = { account: string; name?: string; isPrimary?: boolean };
 type SubaccountCache = Record<string, CachedSubaccount[]>;
 const SUBACCOUNT_CACHE_KEY = 'decibel_subaccounts_cache_mainnet';
@@ -69,6 +72,46 @@ const writeSubaccountCache = (owner: string, subaccounts: CachedSubaccount[]) =>
   const cache = readSubaccountCache();
   cache[normalizeAddress(owner)] = subaccounts;
   localStorage.setItem(SUBACCOUNT_CACHE_KEY, JSON.stringify(cache));
+};
+
+const getTradeNotifyMode = (): TradeNotifyMode => {
+  if (typeof window === 'undefined') return 'key';
+  const value = localStorage.getItem(TRADE_NOTIFY_MODE_KEY);
+  return value === 'off' || value === 'all' || value === 'key' ? value : 'key';
+};
+
+const getTradeIdentity = (trade: any) => (
+  String(
+    trade.trade_id
+      || trade.id
+      || trade.fill_id
+      || trade.execution_id
+      || trade.tx_hash
+      || trade.hash
+      || '',
+  ).trim()
+  || [
+    String(trade.subaccount || ''),
+    String(trade.market || ''),
+    String(trade.side || ''),
+    String(trade.timestamp || ''),
+    String(trade.price || ''),
+    String(trade.size || ''),
+  ].join('|')
+);
+
+const normalizeSource = (source: string) => source.trim().replace(/[\s_-]+/g, '').toLowerCase();
+
+const isKeyTrade = (trade: any) => {
+  const source = normalizeSource(String(trade.source || ''));
+  if (['liquidation', 'autodeleverage', 'adl', 'margincall', 'settlement'].includes(source)) return true;
+  return Math.abs(Number(trade.realized_pnl || 0)) >= 0.01;
+};
+
+const getTradeSideLabel = (trade: any) => {
+  const side = String(trade.side || '').toUpperCase();
+  if (side === 'BUY' || side === 'SELL') return side;
+  return '-';
 };
 
 function App() {
@@ -112,12 +155,15 @@ function App() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [tradesLoading, setTradesLoading] = useState(false);
   const [tradingToasts, setTradingToasts] = useState<TradingToast[]>([]);
+  const [tradeNotifyMode, setTradeNotifyMode] = useState<TradeNotifyMode>(getTradeNotifyMode);
   const lastFetchRef = useRef(0);
   const activeRequestIdRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
   const tradesRequestIdRef = useRef(0);
   const portfolioRequestIdRef = useRef(0);
   const portfolioChartTypeRef = useRef(portfolioChartType);
+  const seenTradeIdsRef = useRef<Set<string>>(new Set());
+  const hasSeededTradeIdsRef = useRef(false);
   const canFetch = () => Date.now() - lastFetchRef.current > 5000;
   const markFetchStarted = () => {
     lastFetchRef.current = Date.now();
@@ -608,6 +654,32 @@ function App() {
         .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
         .slice(0, maxTrades);
 
+      const freshTrades = nextTrades.filter((trade) => {
+        const identity = getTradeIdentity(trade);
+        if (!identity) return false;
+        if (seenTradeIdsRef.current.has(identity)) return false;
+        seenTradeIdsRef.current.add(identity);
+        return true;
+      });
+      seenTradeIdsRef.current = new Set(nextTrades.map(getTradeIdentity).filter(Boolean));
+
+      if (hasSeededTradeIdsRef.current && tradeNotifyMode !== 'off') {
+        const notifyTrades = freshTrades.filter((trade) => (
+          tradeNotifyMode === 'all' || isKeyTrade(trade)
+        ));
+        if (notifyTrades.length > 0) {
+          const latestTrade = notifyTrades[0];
+          const sideLabel = getTradeSideLabel(latestTrade);
+          const marketName = String(latestTrade.market_name || latestTrade.market || 'Unknown');
+          const title = notifyTrades.length > 1 ? `成交提醒 (${notifyTrades.length}笔)` : '成交提醒';
+          const message = notifyTrades.length > 1
+            ? `${marketName} ${sideLabel}，另有 ${notifyTrades.length - 1} 笔新成交`
+            : `${marketName} ${sideLabel} 已成交`;
+          notifyTradingToast({ type: 'success', title, message });
+        }
+      }
+      hasSeededTradeIdsRef.current = true;
+
       setTrades(nextTrades);
     } catch (error: any) {
       if (isLatestTradesRequest()) {
@@ -618,7 +690,60 @@ function App() {
         setTradesLoading(false);
       }
     }
-  }, [accounts, effectiveAccount, setError, setTrades, subaccountAliases]);
+  }, [accounts, effectiveAccount, setError, setTrades, subaccountAliases, tradeNotifyMode]);
+
+  const refreshOpenOrdersQuick = useCallback(async () => {
+    const keyToUse = getApiKeyForNetwork();
+    const ownersToFetch = getSelectedOwners(effectiveAccount, accounts);
+    if (!keyToUse || ownersToFetch.length === 0) return;
+
+    const client = createDecibelClient(keyToUse);
+    const selectedOwnerKeys = new Set(ownersToFetch.map((owner) => normalizeAddress(owner)));
+    const knownSubaccounts = useDashboardStore.getState().subaccounts;
+    const marketMap = useDashboardStore.getState().marketMap;
+    const previousOrders = useDashboardStore.getState().openOrders;
+    const tradingAccounts = knownSubaccounts
+      .filter((subaccount) => subaccount.owner && selectedOwnerKeys.has(normalizeAddress(subaccount.owner)))
+      .map((subaccount) => ({
+        address: subaccount.address,
+        name: subaccount.alias || subaccountAliases[subaccount.address.toLowerCase()] || '',
+        owner: subaccount.owner || '',
+        ownerName: subaccount.ownerName,
+      }));
+    if (tradingAccounts.length === 0) return;
+
+    const orderResults = await Promise.allSettled(tradingAccounts.map(async (tradingAccount) => ({
+      tradingAccount,
+      orders: await client.getOpenOrders(tradingAccount.address),
+    })));
+    const nextOrders = orderResults
+      .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+      .flatMap((result) => (
+        (Array.isArray(result.value.orders) ? result.value.orders : []).map((order: any) => {
+          const size = Number(order.remaining_size || order.size || 0);
+          const price = Number(order.price || 0);
+          const marketName = marketMap.get(order.market) || order.market_name || order.market?.slice(0, 10) || 'Unknown';
+          const previousOrder = previousOrders.find((item: any) => (
+            normalizeAddress(item.subaccount || '') === normalizeAddress(result.value.tradingAccount.address)
+              && String(item.order_id || item.id || '') === String(order.order_id || order.id || '')
+          ));
+          const value = price > 0 ? Math.abs(size) * price : Number(previousOrder?.value || 0);
+          return {
+            ...order,
+            value,
+            market_name: marketName,
+            subaccount: result.value.tradingAccount.address,
+            subaccount_name: result.value.tradingAccount.name,
+            owner: result.value.tradingAccount.owner,
+            owner_name: result.value.tradingAccount.ownerName,
+          };
+        })
+      ));
+
+    if (nextOrders.length > 0 || previousOrders.length === 0) {
+      setOpenOrders(nextOrders);
+    }
+  }, [accounts, effectiveAccount, setOpenOrders, subaccountAliases]);
 
   const loadPortfolioChart = useCallback(async (
     range: string,
@@ -710,20 +835,24 @@ function App() {
       if (!keyToUse || selectedOwners.length === 0) return;
 
       setRefreshing(true);
+      refreshOpenOrdersQuick();
       markFetchStarted();
       fetchData(chartRange);
+      loadRecentTrades();
 
       window.setTimeout(() => {
         const nextKeyToUse = getApiKeyForNetwork();
         if (!nextKeyToUse || selectedOwners.length === 0) return;
+        refreshOpenOrdersQuick();
         markFetchStarted();
         fetchData(chartRange);
+        loadRecentTrades();
       }, 2500);
     };
 
     window.addEventListener(TRADING_REFRESH_EVENT, handleTradingRefresh);
     return () => window.removeEventListener(TRADING_REFRESH_EVENT, handleTradingRefresh);
-  }, [chartRange, fetchData, selectedOwners.length]);
+  }, [chartRange, fetchData, loadRecentTrades, refreshOpenOrdersQuick, selectedOwners.length]);
 
   useEffect(() => {
     const handleTradingToast = (event: Event) => {
@@ -790,6 +919,8 @@ function App() {
     setVolume30d(null);
     setPortfolioData([]);
     setAmps(null, null);
+    hasSeededTradeIdsRef.current = false;
+    seenTradeIdsRef.current = new Set();
   };
 
   const handleRemoveAccount = (address: string) => {
@@ -999,6 +1130,11 @@ function App() {
                 ? { ...subaccount, alias }
                 : subaccount
             ));
+          }}
+          tradeNotifyMode={tradeNotifyMode}
+          onTradeNotifyModeChange={(mode) => {
+            setTradeNotifyMode(mode);
+            localStorage.setItem(TRADE_NOTIFY_MODE_KEY, mode);
           }}
         />
       )}

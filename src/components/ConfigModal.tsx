@@ -12,6 +12,8 @@ interface ConfigModalProps {
   accounts: { address: string; name?: string }[];
   subaccounts: SubaccountAlias[];
   onUpdateSubaccountAlias?: (address: string, alias: string) => void;
+  tradeNotifyMode?: 'off' | 'key' | 'all';
+  onTradeNotifyModeChange?: (mode: 'off' | 'key' | 'all') => void;
 }
 
 const maskKey = (key: string) => {
@@ -41,6 +43,7 @@ const getLocalConfig = () => ({
   accounts: readJsonStorage('decibel_accounts', []),
   current_account: localStorage.getItem('decibel_current_account') || null,
   gas_station_enabled: localStorage.getItem('decibel_gas_station_enabled_mainnet') === 'true',
+  trade_notify_mode: localStorage.getItem('decibel_trade_notify_mode_mainnet') || 'key',
   subaccount_aliases: readJsonStorage('decibel_subaccount_aliases_mainnet', {}),
 });
 
@@ -124,6 +127,8 @@ export function ConfigModal({
   accounts,
   subaccounts,
   onUpdateSubaccountAlias,
+  tradeNotifyMode = 'key',
+  onTradeNotifyModeChange,
 }: ConfigModalProps) {
   const storedMainnetKey = typeof window !== 'undefined' ? localStorage.getItem('decibel_api_key_mainnet') || '' : '';
   const storedGasStationKey = typeof window !== 'undefined' ? localStorage.getItem('decibel_gas_station_api_key_mainnet') || '' : '';
@@ -247,6 +252,10 @@ export function ConfigModal({
       }
       if (typeof config.gas_station_enabled === 'boolean') {
         localStorage.setItem('decibel_gas_station_enabled_mainnet', config.gas_station_enabled ? 'true' : 'false');
+      }
+      if (config.trade_notify_mode === 'off' || config.trade_notify_mode === 'key' || config.trade_notify_mode === 'all') {
+        localStorage.setItem('decibel_trade_notify_mode_mainnet', config.trade_notify_mode);
+        onTradeNotifyModeChange?.(config.trade_notify_mode);
       }
 
       setConfigMessage({ type: 'success', text: '配置已导入，页面将刷新以应用变更' });
@@ -503,6 +512,30 @@ export function ConfigModal({
                       关闭后平仓和撤单使用 Owner 钱包付 gas，提交时需要 Owner 钱包额外签名。
                     </div>
                   )}
+                </div>
+              )}
+
+              {IS_TRADING_MODE && (
+                <div className="settings-card">
+                  <div className="settings-card-heading">
+                    <div className="settings-card-heading-main">
+                      <strong>成交提醒</strong>
+                      <span>默认仅关键提醒，使用右下角 toast，不打断下单流程</span>
+                    </div>
+                  </div>
+                  <div className="key-config-row">
+                    <div className="key-config-main">
+                      <select
+                        className="form-input"
+                        value={tradeNotifyMode}
+                        onChange={(event) => onTradeNotifyModeChange?.(event.target.value as 'off' | 'key' | 'all')}
+                      >
+                        <option value="off">关闭提醒</option>
+                        <option value="key">仅关键提醒</option>
+                        <option value="all">全部成交提醒</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

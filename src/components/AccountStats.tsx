@@ -1,5 +1,5 @@
 import { useDashboardStore } from '../store';
-import { formatAmp, formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
+import { formatDisplayAmp, formatDisplayMoney, formatDisplaySignedMoney } from '../utils/displayFormat';
 
 const PERCENT = new Intl.NumberFormat('en-US', {
   style: 'percent',
@@ -26,11 +26,11 @@ export function AccountStats() {
     <div className="stats-grid">
       <div className="stat-card stat-card-equity">
         <div className="stat-label">账户权益</div>
-        <div className="stat-value mono">{formatCurrency(equity)}</div>
+        <div className="stat-value mono">{formatDisplayMoney(equity)}</div>
         <div className="stat-change text-secondary">
           已实现盈亏:{' '}
           <span className={realizedPnl === 0 ? '' : realizedPnl > 0 ? 'positive' : 'negative'}>
-            {formatSignedCurrency(realizedPnl)}
+            {formatDisplaySignedMoney(realizedPnl)}
           </span>
         </div>
       </div>
@@ -38,12 +38,12 @@ export function AccountStats() {
       <div className="stat-card stat-card-pnl">
         <div className="stat-label">总盈亏</div>
         <div className={`stat-value mono ${totalPnl >= 0 ? 'positive' : 'negative'}`}>
-          {formatSignedCurrency(totalPnl)}
+          {formatDisplaySignedMoney(totalPnl)}
         </div>
         <div className="stat-change text-secondary">
           未实现:{' '}
           <span className={unrealizedPnl === 0 ? '' : unrealizedPnl > 0 ? 'positive' : 'negative'}>
-            {formatSignedCurrency(unrealizedPnl)}
+            {formatDisplaySignedMoney(unrealizedPnl)}
           </span>
         </div>
       </div>
@@ -55,10 +55,10 @@ export function AccountStats() {
         </div>
         <div className="stat-change text-secondary">
           缺口:{' '}
-          <span className={marginDeficit > 0 ? 'negative' : ''}>{formatCurrency(marginDeficit)}</span>
+          <span className={marginDeficit > 0 ? 'negative' : ''}>{formatDisplayMoney(marginDeficit)}</span>
           {' '}| 清算费:{' '}
           <span className={liquidationFeesPaid > 0 ? 'negative' : ''}>
-            {formatCurrency(liquidationFeesPaid)}
+            {formatDisplayMoney(liquidationFeesPaid)}
           </span>
         </div>
       </div>
@@ -66,10 +66,10 @@ export function AccountStats() {
       <div className="stat-card stat-card-volume">
         <div className="stat-label">30天交易量</div>
         <div className="stat-value mono">
-          {volume30d !== null ? formatCurrency(volume30d) : '-'}
+          {volume30d !== null ? formatDisplayMoney(volume30d) : '-'}
         </div>
         <div className="stat-change text-secondary">
-          日均: {avgDailyVolume !== null ? formatCurrency(avgDailyVolume) : '-'}
+          日均: {avgDailyVolume !== null ? formatDisplayMoney(avgDailyVolume) : '-'}
         </div>
       </div>
 
@@ -79,7 +79,7 @@ export function AccountStats() {
           <>
             <div className="amp-main-row">
               <span className="stat-value mono amp-value">
-                {formatAmp(amps)}
+                {formatDisplayAmp(amps)}
               </span>
               {ampsRank && (
                 <span className="amp-rank text-secondary">
@@ -89,7 +89,7 @@ export function AccountStats() {
             </div>
             {ampsDailyDelta !== null && (
               <div className="stat-change positive">
-                今日新增: +{formatAmp(Math.max(0, ampsDailyDelta))}
+                今日新增: +{formatDisplayAmp(Math.max(0, ampsDailyDelta))}
               </div>
             )}
           </>

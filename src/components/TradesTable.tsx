@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
-import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
-import { formatCurrency, formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
+import { formatDisplayMarketPrice, formatDisplayMarketSize, formatDisplayMarketValue, formatDisplayMoney, formatDisplaySignedMoney } from '../utils/displayFormat';
 
 const formatAddress = (address?: string) => {
   if (!address) return '-';
@@ -141,12 +140,12 @@ export function TradesTable() {
                 <td>
                   <span className={getSourceClassName(source)}>{getSourceLabel(source)}</span>
                 </td>
-                <td className="mono">{formatMarketSize(trade.size, trade, markets)}</td>
-                <td className="mono">{Number(trade.price || 0) > 0 ? formatMarketPrice(trade.price, trade, markets) : '-'}</td>
-                <td className="mono">{value > 0 ? formatNumberAmount(value) : '-'}</td>
-                <td className="mono">{fee ? formatCurrency(fee) : '-'}</td>
+                <td className="mono">{formatDisplayMarketSize(trade.size, trade, markets)}</td>
+                <td className="mono">{Number(trade.price || 0) > 0 ? formatDisplayMarketPrice(trade.price, trade, markets) : '-'}</td>
+                <td className="mono">{value > 0 ? formatDisplayMarketValue(value) : '-'}</td>
+                <td className="mono">{fee ? formatDisplayMoney(fee) : '-'}</td>
                 <td className={`mono ${!hasRealizedPnl || realizedPnl >= 0 ? 'positive' : 'negative'}`}>
-                  {hasRealizedPnl ? formatSignedCurrency(realizedPnl) : '-'}
+                  {hasRealizedPnl ? formatDisplaySignedMoney(realizedPnl) : '-'}
                 </td>
               </tr>
             );

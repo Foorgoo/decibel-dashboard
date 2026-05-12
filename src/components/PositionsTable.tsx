@@ -3,8 +3,13 @@ import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { PositionPricePanel } from './PositionPricePanel';
 import { IS_TRADING_MODE } from '../config/appMode';
-import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
-import { formatCurrency, formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
+import {
+  formatDisplayMarketPrice,
+  formatDisplayMarketSize,
+  formatDisplayMarketValue,
+  formatDisplayMoney,
+  formatDisplaySignedMoney,
+} from '../utils/displayFormat';
 
 const ClosePositionActions = lazy(() => import('../features/trading/ClosePositionActions').then((module) => ({
   default: module.ClosePositionActions,
@@ -56,7 +61,7 @@ const getFundingDisplayValue = (fundingCost: number) => -fundingCost;
 
 const formatPositionSize = (position: any, markets: any[]) => {
   const size = Math.abs(Number(position.size || 0));
-  return formatMarketSize(size, position, markets);
+  return formatDisplayMarketSize(size, position, markets);
 };
 
 type SortKey = 'market' | 'subaccount' | 'side' | 'size' | 'value' | 'entry' | 'mark' | 'pnl' | 'liq' | 'margin' | 'funding';
@@ -221,23 +226,23 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
                     </span>
                   </td>
                   <td className="mono">{formatPositionSize(pos, markets)}</td>
-                  <td className="mono">{value > 0 ? formatNumberAmount(value) : '-'}</td>
-                  <td className="mono">{entryPrice > 0 ? formatMarketPrice(entryPrice, pos, markets) : '-'}</td>
-                  <td className="mono">{markPrice > 0 ? formatMarketPrice(markPrice, pos, markets) : '-'}</td>
+                  <td className="mono">{value > 0 ? formatDisplayMarketValue(value) : '-'}</td>
+                  <td className="mono">{entryPrice > 0 ? formatDisplayMarketPrice(entryPrice, pos, markets) : '-'}</td>
+                  <td className="mono">{markPrice > 0 ? formatDisplayMarketPrice(markPrice, pos, markets) : '-'}</td>
                   <td className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>
-                    {formatSignedCurrency(pnl)}
+                    {formatDisplaySignedMoney(pnl)}
                   </td>
-                  <td className="mono">{liqPrice > 0 ? formatMarketPrice(liqPrice, pos, markets) : '-'}</td>
+                  <td className="mono">{liqPrice > 0 ? formatDisplayMarketPrice(liqPrice, pos, markets) : '-'}</td>
                   <td className="mono">
                     {margin ? (
                       <span>
-                        {formatCurrency(margin)}
+                        {formatDisplayMoney(margin)}
                         <span className="cell-subtext">{marginMode}{marginMode && leverage ? ' · ' : ''}{leverage ? `${leverage}x` : ''}</span>
                       </span>
                     ) : '-'}
                   </td>
                   <td className={`mono ${fundingDisplayValue === null || fundingDisplayValue === 0 ? '' : fundingDisplayValue > 0 ? 'positive' : 'negative'}`}>
-                    {fundingDisplayValue !== null ? formatSignedCurrency(fundingDisplayValue) : '-'}
+                    {fundingDisplayValue !== null ? formatDisplaySignedMoney(fundingDisplayValue) : '-'}
                   </td>
                   {IS_TRADING_MODE && (
                     <td>

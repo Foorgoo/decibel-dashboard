@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { useDashboardStore } from '../store';
 import { getMarketIcon, getMarketSymbol } from '../utils/marketIcons';
-import { formatCurrency, formatSignedCurrency } from '../utils/numberFormat';
+import { formatDisplayMoney, formatDisplaySignedMoney } from '../utils/displayFormat';
 
 const PERCENT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 1,
@@ -42,12 +42,12 @@ function AllocationTooltip({ active, payload }: { active?: boolean; payload?: an
         )}
         <span>{item.name}</span>
       </div>
-      <div className="mono">{formatCurrency(item.value)} · {PERCENT.format(item.percent)}%</div>
+      <div className="mono">{formatDisplayMoney(item.value)} · {PERCENT.format(item.percent)}%</div>
       <div className={`mono ${item.pnl >= 0 ? 'positive' : 'negative'}`}>
-        盈亏 {formatSignedCurrency(item.pnl)}
+        盈亏 {formatDisplaySignedMoney(item.pnl)}
       </div>
       <div className="text-secondary">
-        多 {formatCurrency(item.longValue)} · 空 {formatCurrency(item.shortValue)}
+        多 {formatDisplayMoney(item.longValue)} · 空 {formatDisplayMoney(item.shortValue)}
       </div>
     </div>
   );
@@ -143,9 +143,9 @@ export function PositionAllocationChart() {
             </ResponsiveContainer>
             <div className="allocation-center">
               <span>总价值</span>
-              <strong>{formatCurrency(total)}</strong>
+              <strong>{formatDisplayMoney(total)}</strong>
               <span className={totalPnl >= 0 ? 'positive' : 'negative'}>
-                {formatSignedCurrency(totalPnl)}
+                {formatDisplaySignedMoney(totalPnl)}
               </span>
             </div>
           </div>
@@ -163,9 +163,9 @@ export function PositionAllocationChart() {
                   <strong>{item.name}</strong>
                 </span>
                 <span>{PERCENT.format(item.percent)}%</span>
-                <span>{formatCurrency(item.value)}</span>
+                <span>{formatDisplayMoney(item.value)}</span>
                 <span className={item.pnl >= 0 ? 'positive' : 'negative'}>
-                  {formatSignedCurrency(item.pnl)}
+                  {formatDisplaySignedMoney(item.pnl)}
                 </span>
               </div>
             ))}

@@ -7,6 +7,7 @@
     "dev": "vite --mode trading",
     "dev:dashboard": "vite --mode dashboard",
     "dev:trading": "vite --mode trading",
+    "check:formatting": "node scripts/check-formatting-rules.mjs",
     "build": "tsc && vite build --mode trading",
     "build:dashboard": "tsc && vite build --mode dashboard",
     "build:trading": "tsc && vite build --mode trading",

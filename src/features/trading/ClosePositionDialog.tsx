@@ -10,8 +10,14 @@ import { formatTradingError, submitGasStationTransaction, submitOwnerFeePayerTra
 import { TRADING_REFRESH_EVENT, notifyTradingToast } from './events';
 import { useDetectedWalletAddress } from './walletAccount';
 import { normalizeAddress } from '../../utils/dashboardData';
-import { formatMarketPrice, formatMarketSize, getMarketPriceDecimals, getMarketSizeDecimals } from '../../utils/marketPrecision';
-import { formatNumberAmount, formatSignedCurrency } from '../../utils/numberFormat';
+import {
+  formatDisplayMarketPrice,
+  formatDisplayMarketSize,
+  formatDisplayMarketValue,
+  formatDisplaySignedMoney,
+  getMarketPriceDecimals,
+  getMarketSizeDecimals,
+} from '../../utils/displayFormat';
 
 const PERCENT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -225,10 +231,10 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
   const selectedPnl = getPositionPnl(position, displayClosePrice, closeSize, draft.size);
   const closeValue = closeSize * (displayClosePrice > 0 ? displayClosePrice : referencePrice);
   const pnlPercent = closeValue > 0 ? (selectedPnl / closeValue) * 100 : 0;
-  const formattedCloseSize = formatMarketSize(closeSize, position, markets);
-  const formattedClosePrice = formatMarketPrice(displayClosePrice, position, markets);
+  const formattedCloseSize = formatDisplayMarketSize(closeSize, position, markets);
+  const formattedClosePrice = formatDisplayMarketPrice(displayClosePrice, position, markets);
   const formattedLimitPrice = Number.isFinite(effectiveLimitPrice) && effectiveLimitPrice > 0
-    ? formatMarketPrice(effectiveLimitPrice, position, markets)
+    ? formatDisplayMarketPrice(effectiveLimitPrice, position, markets)
     : '-';
   const closePriceSummary = mode === 'limit' ? formattedLimitPrice : formattedClosePrice;
   const tokenSymbol = draft.marketName.split('-')[0].split('/')[0];
@@ -454,12 +460,12 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
               <strong className="mono">
                 {mode === 'market'
                   ? marketDepth ? `${SLIPPAGE_PERCENT.format(estimatedSlippage)}%` : '0.0000%'
-                  : closeValue > 0 ? formatNumberAmount(closeValue) : '-'}
+                  : closeValue > 0 ? formatDisplayMarketValue(closeValue) : '-'}
               </strong>
             </div>
             <div>
               <span>{mode === 'market' ? '预估盈亏' : '盈亏'}</span>
-              <strong className={selectedPnl >= 0 ? 'positive' : 'negative'}>{formatSignedCurrency(selectedPnl)}</strong>
+              <strong className={selectedPnl >= 0 ? 'positive' : 'negative'}>{formatDisplaySignedMoney(selectedPnl)}</strong>
             </div>
           </div>
 
@@ -511,7 +517,7 @@ export function ClosePositionDialog({ mode, position, onClose }: ClosePositionDi
           </div>
 
           <div className={`trade-pnl-line ${selectedPnl >= 0 ? 'positive' : 'negative'}`}>
-            预估 {formatSignedCurrency(selectedPnl)} / {PERCENT.format(pnlPercent)}% {selectedPnl >= 0 ? '盈利' : '亏损'}
+            预估 {formatDisplaySignedMoney(selectedPnl)} / {PERCENT.format(pnlPercent)}% {selectedPnl >= 0 ? '盈利' : '亏损'}
           </div>
 
           <div className="trade-slider-wrap">

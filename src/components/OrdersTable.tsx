@@ -2,8 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
 import { IS_TRADING_MODE } from '../config/appMode';
-import { formatMarketPrice, formatMarketSize } from '../utils/marketPrecision';
-import { formatNumberAmount, formatSignedCurrency } from '../utils/numberFormat';
+import { formatDisplayMarketPrice, formatDisplayMarketSize, formatDisplayMarketValue, formatDisplaySignedMoney } from '../utils/displayFormat';
 
 const CancelOrderAction = lazy(() => import('../features/trading/CancelOrderAction').then((module) => ({
   default: module.CancelOrderAction,
@@ -111,7 +110,7 @@ const getOrderSize = (order: any) => Math.abs(Number(order.remaining_size || ord
 
 const formatOrderSize = (order: any, markets: any[]) => {
   const size = Number(order.remaining_size || order.size || 0);
-  return formatMarketSize(size, order, markets);
+  return formatDisplayMarketSize(size, order, markets);
 };
 
 const getOrderPnl = (order: any, positions: any[]) => {
@@ -288,12 +287,12 @@ export function OrdersTable({ embedded = false }: OrdersTableProps) {
                     </span>
                   </td>
                   <td className="mono">{formatOrderSize(order, markets)}</td>
-                  <td className="mono">{value > 0 ? formatNumberAmount(value) : '-'}</td>
+                  <td className="mono">{value > 0 ? formatDisplayMarketValue(value) : '-'}</td>
                   <td className="mono">
-                    {Number(order.price || 0) > 0 ? formatMarketPrice(order.price, order, markets) : 'Market'}
+                    {Number(order.price || 0) > 0 ? formatDisplayMarketPrice(order.price, order, markets) : 'Market'}
                   </td>
                   <td className={`mono ${pnl === null ? 'text-muted' : pnl >= 0 ? 'positive' : 'negative'}`}>
-                    {pnl === null ? '-' : formatSignedCurrency(pnl)}
+                    {pnl === null ? '-' : formatDisplaySignedMoney(pnl)}
                   </td>
                   <td>
                     {reduceOnly === null ? '-' : (

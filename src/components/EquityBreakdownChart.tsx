@@ -1,5 +1,6 @@
 import { useDashboardStore } from '../store';
-import { formatCurrency, normalizeCurrencyAmount } from '../utils/numberFormat';
+import { formatDisplayMoney } from '../utils/displayFormat';
+import { normalizeCurrencyAmount } from '../utils/numberFormat';
 
 const PERCENT = new Intl.NumberFormat('en-US', {
   style: 'percent',
@@ -60,7 +61,7 @@ export function EquityBreakdownChart() {
 
       <div className="equity-breakdown-head">
         <span className="text-secondary">账户权益</span>
-        <strong className="mono">{formatCurrency(equity)}</strong>
+        <strong className="mono">{formatDisplayMoney(equity)}</strong>
       </div>
 
       <div className="equity-stack" aria-label="可提款余额和保证金占用占比">
@@ -79,8 +80,8 @@ export function EquityBreakdownChart() {
       </div>
 
       <div className="equity-stack-legend">
-        <span><i className="equity-dot equity-dot-withdrawable" />可提款 {formatCurrency(withdrawable)}</span>
-        <span><i className="equity-dot equity-dot-margin" />保证金 {formatCurrency(totalMargin)} · {PERCENT.format(Math.max(marginUsage, 0))}</span>
+        <span><i className="equity-dot equity-dot-withdrawable" />可提款 {formatDisplayMoney(withdrawable)}</span>
+        <span><i className="equity-dot equity-dot-margin" />保证金 {formatDisplayMoney(totalMargin)} · {PERCENT.format(Math.max(marginUsage, 0))}</span>
       </div>
 
       <div className="equity-breakdown-rows">
@@ -90,7 +91,7 @@ export function EquityBreakdownChart() {
             <div key={row.label} className="equity-breakdown-row">
               <div className="equity-breakdown-row-head">
                 <span>{row.label}</span>
-                <strong className={`mono ${row.tone}`}>{row.value > 0 && row.tone !== 'neutral' ? '+' : ''}{formatCurrency(row.value)}</strong>
+                <strong className={`mono ${row.tone}`}>{row.value > 0 && row.tone !== 'neutral' ? '+' : ''}{formatDisplayMoney(row.value)}</strong>
               </div>
               <div className="equity-breakdown-track">
                 <span

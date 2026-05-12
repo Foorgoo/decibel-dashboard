@@ -10,7 +10,8 @@ import {
 } from 'recharts';
 import { useDashboardStore } from '../store';
 import { normalizeTimestamp, pickFirst } from '../utils/dashboardData';
-import { formatCurrency, normalizeCurrencyAmount } from '../utils/numberFormat';
+import { formatDisplayMoney } from '../utils/displayFormat';
+import { normalizeCurrencyAmount } from '../utils/numberFormat';
 
 const RANGES: { label: string; value: string }[] = [
   { label: '24小时', value: '24h' },
@@ -152,7 +153,7 @@ function CustomTooltip({
       </div>
       <div className="mono" style={{ color }}>
         <span className="text-secondary" style={{ marginRight: 6 }}>{valueLabel}</span>
-        {formatCurrency(Number(payload[0].value || 0))}
+        {formatDisplayMoney(Number(payload[0].value || 0))}
       </div>
     </div>
   );

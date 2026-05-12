@@ -1,6 +1,6 @@
 import { useDashboardStore } from '../store';
 import { MarketLabel } from './MarketLabel';
-import { formatCompactCurrency, formatCurrency } from '../utils/numberFormat';
+import { formatDisplayCompactMoney, formatDisplayMoney } from '../utils/displayFormat';
 
 const formatTime = (timestamp: number | null) => {
   if (!timestamp) return '未刷新';
@@ -57,18 +57,18 @@ export function RiskSummary({ lastUpdatedAt }: RiskSummaryProps) {
       <div className="summary-primary">
         <div className="summary-item">
           <span className="summary-label">持仓价值</span>
-          <span className="summary-value mono">{formatCurrency(positionValue)}</span>
+          <span className="summary-value mono">{formatDisplayMoney(positionValue)}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">挂单价值</span>
-          <span className="summary-value mono">{formatCurrency(orderValue)}</span>
+          <span className="summary-value mono">{formatDisplayMoney(orderValue)}</span>
         </div>
         <div className="summary-item summary-exposure-item">
           <span className="summary-label">最大市场暴露</span>
           {largestExposure ? (
             <span className="summary-market">
               <MarketLabel marketName={getBaseSymbol(largestExposure[0])} />
-              <span className="summary-value mono">{formatCurrency(largestExposure[1])}</span>
+              <span className="summary-value mono">{formatDisplayMoney(largestExposure[1])}</span>
             </span>
           ) : (
             <span className="summary-value mono">-</span>
@@ -78,16 +78,16 @@ export function RiskSummary({ lastUpdatedAt }: RiskSummaryProps) {
       <div className="summary-compact-group">
         <div className="summary-compact-item summary-exposure-compact">
           <span className="summary-label">多头</span>
-          <span className="summary-value mono positive">{formatCompactCurrency(longValue)}</span>
+          <span className="summary-value mono positive">{formatDisplayCompactMoney(longValue)}</span>
         </div>
         <div className="summary-compact-item summary-exposure-compact">
           <span className="summary-label">空头</span>
-          <span className="summary-value mono negative">{formatCompactCurrency(shortValue)}</span>
+          <span className="summary-value mono negative">{formatDisplayCompactMoney(shortValue)}</span>
         </div>
         <div className="summary-compact-item summary-net-item">
           <span className="summary-label">净敞口</span>
           <span className={`summary-value mono ${netExposure > 0 ? 'positive' : netExposure < 0 ? 'negative' : ''}`}>
-            {netExposureSide} {formatCompactCurrency(Math.abs(netExposure))}
+            {netExposureSide} {formatDisplayCompactMoney(Math.abs(netExposure))}
           </span>
         </div>
         <div className="summary-compact-item">

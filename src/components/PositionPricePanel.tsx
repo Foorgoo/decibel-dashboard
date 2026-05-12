@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MarketLabel } from './MarketLabel';
 import { createDecibelClient } from '../api/client';
 import { useDashboardStore } from '../store';
-import { formatMarketPrice } from '../utils/marketPrecision';
-import { formatSignedCurrency } from '../utils/numberFormat';
+import { formatDisplayMarketPrice, formatDisplaySignedMoney } from '../utils/displayFormat';
 
 const INTERVALS = [
   { label: '15m', value: '15m', limit: 96, stepMs: 15 * 60 * 1000 },
@@ -97,7 +96,7 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
   const pnl = Number(position.pnl || position.unrealized_pnl || 0);
   const side = size >= 0 ? 'LONG' : 'SHORT';
   const activeInterval = INTERVALS.find((item) => item.value === interval) || INTERVALS[1];
-  const formatPrice = (value: number) => formatMarketPrice(value, position, markets);
+  const formatPrice = (value: number) => formatDisplayMarketPrice(value, position, markets);
   const keyToUse = typeof window !== 'undefined'
     ? localStorage.getItem('decibel_api_key_mainnet') || apiKey
     : apiKey;
@@ -214,7 +213,7 @@ export function PositionPricePanel({ position, onClose }: PositionPricePanelProp
           </div>
           <div>
             <span>未实现盈亏</span>
-            <strong className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>{formatSignedCurrency(pnl)}</strong>
+            <strong className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>{formatDisplaySignedMoney(pnl)}</strong>
           </div>
         </div>
 

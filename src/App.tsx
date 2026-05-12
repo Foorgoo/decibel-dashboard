@@ -928,8 +928,9 @@ function App() {
     const handleTradingToast = (event: Event) => {
       const detail = (event as CustomEvent<TradingToastDetail>).detail;
       if (!detail) return;
-      const isTradeReminder = detail.title.startsWith('成交提醒');
-      if (isTradeReminder && tradeNotifySoundEnabled) {
+      const shouldPlaySound = detail.title.startsWith('成交提醒')
+        || detail.title === '平仓订单已提交';
+      if (shouldPlaySound && tradeNotifySoundEnabled) {
         playTradeReminderSound();
       }
 

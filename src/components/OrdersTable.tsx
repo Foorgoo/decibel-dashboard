@@ -17,6 +17,7 @@ const formatAliasAddress = (address?: string) => {
   if (!address) return '-';
   return address.slice(0, 6);
 };
+const normalizeSubaccount = (value: unknown) => String(value || '').toLowerCase();
 
 const getSubaccountLabel = (order: any) => {
   const address = order.subaccount || '';
@@ -151,6 +152,7 @@ export function OrdersTable({ embedded = false }: OrdersTableProps) {
   const { openOrders, positions, markets } = useDashboardStore();
   const [sortKey, setSortKey] = useState<SortKey>('time');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [hoveredSubaccount, setHoveredSubaccount] = useState('');
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -269,10 +271,19 @@ export function OrdersTable({ embedded = false }: OrdersTableProps) {
               const pnl = getOrderPnl(order, positions);
               const timestamp = getOrderTimestamp(order);
               const reduceOnly = getReduceOnly(order);
+              const normalizedSubaccount = normalizeSubaccount(order.subaccount);
               return (
-                <tr key={orderId || `${order.market || 'order'}-${idx}`} className="table-row">
+                <tr
+                  key={orderId || `${order.market || 'order'}-${idx}`}
+                  className={`table-row${hoveredSubaccount && hoveredSubaccount === normalizedSubaccount ? ' table-row-linked' : ''}`}
+                >
                   <td className="mono subaccount-cell" title={order.subaccount}>
-                    {getSubaccountLabel(order)}
+                    <span
+                      onMouseEnter={() => setHoveredSubaccount(normalizedSubaccount)}
+                      onMouseLeave={() => setHoveredSubaccount('')}
+                    >
+                      {getSubaccountLabel(order)}
+                    </span>
                   </td>
                   <td className="mono">{formatOrderTime(timestamp)}</td>
                   <td>

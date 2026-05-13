@@ -12,6 +12,7 @@ const formatAliasAddress = (address?: string) => {
   if (!address) return '-';
   return address.slice(0, 6);
 };
+const normalizeSubaccount = (value: unknown) => String(value || '').toLowerCase();
 
 const getSubaccountLabel = (trade: any) => {
   const address = trade.subaccount || '';
@@ -66,6 +67,7 @@ export function TradesTable() {
   const loadStep = isMultiAccountMode ? 20 : 10;
   const maxRows = isMultiAccountMode ? 500 : 200;
   const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
+  const [hoveredSubaccount, setHoveredSubaccount] = useState('');
 
   useEffect(() => {
     setVisibleCount(initialVisibleCount);
@@ -113,11 +115,20 @@ export function TradesTable() {
             const realizedPnl = Number(trade.realized_pnl);
             const fee = Number(trade.fee || 0);
             const hasRealizedPnl = Number.isFinite(realizedPnl);
+            const normalizedSubaccount = normalizeSubaccount(trade.subaccount);
 
             return (
-              <tr key={trade.trade_id || trade.id || `${trade.market || 'trade'}-${timestamp}-${idx}`} className="table-row">
+              <tr
+                key={trade.trade_id || trade.id || `${trade.market || 'trade'}-${timestamp}-${idx}`}
+                className={`table-row${hoveredSubaccount && hoveredSubaccount === normalizedSubaccount ? ' table-row-linked' : ''}`}
+              >
                 <td className="mono subaccount-cell" title={trade.subaccount}>
-                  {getSubaccountLabel(trade)}
+                  <span
+                    onMouseEnter={() => setHoveredSubaccount(normalizedSubaccount)}
+                    onMouseLeave={() => setHoveredSubaccount('')}
+                  >
+                    {getSubaccountLabel(trade)}
+                  </span>
                 </td>
                 <td className="mono">
                   {timestamp ? new Date(timestamp).toLocaleString('zh-CN', {

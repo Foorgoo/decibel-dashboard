@@ -230,6 +230,7 @@ function App() {
   const activeRequestIdRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
   const tradesRequestIdRef = useRef(0);
+  const lastTradesFetchRef = useRef(0);
   const portfolioRequestIdRef = useRef(0);
   const portfolioChartTypeRef = useRef(portfolioChartType);
   const seenTradeIdsRef = useRef<Set<string>>(new Set());
@@ -656,6 +657,7 @@ function App() {
     }
 
     setTradesLoading(true);
+    lastTradesFetchRef.current = Date.now();
     try {
       const tradeHistoryLimit = ownersToFetch.length > 1 ? '50' : '200';
       const maxTrades = ownersToFetch.length > 1 ? 500 : 200;
@@ -879,9 +881,7 @@ function App() {
     setRefreshing(true);
     markFetchStarted();
     fetchData(chartRange);
-    if (activeDataTab === 'trades') {
-      loadRecentTrades();
-    }
+    loadRecentTrades();
   };
 
   // Trigger data fetch when account changes
@@ -964,9 +964,34 @@ function App() {
         markFetchStarted();
         fetchData(chartRange);
       }
+
+      if (keyToUse && selectedOwners.length > 0) {
+        const now = Date.now();
+        const tradesIntervalMs = activeDataTab === 'trades' ? 10_000 : 25_000;
+        if (now - lastTradesFetchRef.current >= tradesIntervalMs) {
+          loadRecentTrades();
+        }
+      }
     }, 10000);
     return () => clearInterval(interval);
-  }, [effectiveAccount, chartRange, fetchData]);
+  }, [activeDataTab, chartRange, effectiveAccount, fetchData, loadRecentTrades, selectedOwners.length]);
+
+  const handleActiveDataTabChange = useCallback((tab: 'positions' | 'orders' | 'trades') => {
+    setActiveDataTab(tab);
+    const keyToUse = getApiKeyForNetwork();
+    if (!keyToUse || selectedOwners.length === 0) return;
+
+    if (tab === 'trades') {
+      loadRecentTrades();
+      return;
+    }
+
+    if (canFetch()) {
+      setRefreshing(true);
+      markFetchStarted();
+      fetchData(chartRange);
+    }
+  }, [chartRange, fetchData, loadRecentTrades, selectedOwners.length]);
 
   const handleSaveApiKey = (mainnetKey: string) => {
     if (typeof window !== 'undefined') {
@@ -1151,7 +1176,7 @@ function App() {
             <DataTabs
               showTrades
               tradesLoading={tradesLoading}
-              onActiveTabChange={setActiveDataTab}
+              onActiveTabChange={handleActiveDataTabChange}
               onTradesTabOpen={loadRecentTrades}
             />
           </div>

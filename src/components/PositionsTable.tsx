@@ -24,6 +24,7 @@ const formatAliasAddress = (address?: string) => {
   if (!address) return '-';
   return address.slice(0, 6);
 };
+const normalizeSubaccount = (value: unknown) => String(value || '').toLowerCase();
 
 const getSubaccountLabel = (pos: any) => {
   const address = pos.subaccount || '';
@@ -76,6 +77,7 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedPosition, setSelectedPosition] = useState<any | null>(null);
+  const [hoveredSubaccount, setHoveredSubaccount] = useState('');
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -209,11 +211,20 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
               
               const side = size > 0 ? 'long' : 'short';
               const marketName = pos.market_name || pos.market?.slice(0, 10) || 'Unknown';
+              const normalizedSubaccount = normalizeSubaccount(pos.subaccount);
               
               return (
-                <tr key={`${pos.market || 'position'}-${idx}`} className="table-row">
+                <tr
+                  key={`${pos.market || 'position'}-${idx}`}
+                  className={`table-row${hoveredSubaccount && hoveredSubaccount === normalizedSubaccount ? ' table-row-linked' : ''}`}
+                >
                   <td className="mono subaccount-cell" title={pos.subaccount}>
-                    {getSubaccountLabel(pos)}
+                    <span
+                      onMouseEnter={() => setHoveredSubaccount(normalizedSubaccount)}
+                      onMouseLeave={() => setHoveredSubaccount('')}
+                    >
+                      {getSubaccountLabel(pos)}
+                    </span>
                   </td>
                   <td>
                     <button className="market-trigger" onClick={() => setSelectedPosition(pos)}>
@@ -232,7 +243,7 @@ export function PositionsTable({ embedded = false }: PositionsTableProps) {
                   <td className={`mono ${pnl >= 0 ? 'positive' : 'negative'}`}>
                     {formatDisplaySignedMoney(pnl)}
                   </td>
-                  <td className="mono">{liqPrice > 0 ? formatDisplayMarketPrice(liqPrice, pos, markets) : '-'}</td>
+                  <td className="mono liq-price">{liqPrice > 0 ? formatDisplayMarketPrice(liqPrice, pos, markets) : '-'}</td>
                   <td className="mono">
                     {margin ? (
                       <span>

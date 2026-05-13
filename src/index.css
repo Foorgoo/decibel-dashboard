@@ -851,6 +851,10 @@ body {
   background: var(--bg-card-hover);
 }
 
+.table-row.table-row-linked {
+  background: rgba(255, 184, 0, 0.12);
+}
+
 .table-footer-actions {
   display: flex;
   justify-content: center;
@@ -877,6 +881,10 @@ body {
   font-size: 11px;
   line-height: 1.25;
   margin-top: 2px;
+}
+
+.liq-price {
+  color: #d4bc67;
 }
 
 .market-label {

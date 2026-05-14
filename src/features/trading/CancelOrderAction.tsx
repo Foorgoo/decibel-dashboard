@@ -18,7 +18,7 @@ interface CancelOrderActionProps {
   order: any;
 }
 
-const getOrderId = (order: any) => String(order.order_id || order.id || '');
+const getOrderId = (order: any) => String(order.order_id ?? order.orderId ?? order.id ?? order.orderID ?? '');
 
 const getMarketName = (order: any) => {
   const marketName = String(order.market_name || order.market || '');
@@ -127,7 +127,7 @@ export function CancelOrderAction({ order }: CancelOrderActionProps) {
       });
       // Optimistically remove this order from local list to avoid stale duplicate rows
       setOpenOrders(openOrders.filter((item: any) => !(
-        String(item.order_id || item.id || '') === orderId
+        getOrderId(item) === orderId
           && normalizeAddress(String(item.subaccount || '')) === normalizeAddress(subaccount)
       )));
       window.dispatchEvent(new CustomEvent(TRADING_REFRESH_EVENT, {

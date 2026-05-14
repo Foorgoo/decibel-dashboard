@@ -228,15 +228,45 @@ const getTradeSideLabel = (trade: any) => {
   return '-';
 };
 
+const pickOrderStatus = (order: any) => (
+  order?.status
+    ?? order?.order_status
+    ?? order?.orderStatus
+    ?? order?.state
+    ?? order?.order_state
+    ?? order?.orderState
+    ?? ''
+);
+const normalizeOrderStatus = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
 const isOpenOrderLike = (order: any) => {
-  const normalized = String(order?.status || 'open').trim().toLowerCase();
-  const remainingSize = Number(order?.remaining_size ?? order?.remainingSize ?? order?.size ?? 0);
-  if (!Number.isFinite(remainingSize) || remainingSize <= 0) return false;
+  const normalized = normalizeOrderStatus(pickOrderStatus(order) || 'open');
+  const remainingValue = order?.remaining_size
+    ?? order?.remainingSize
+    ?? order?.remaining
+    ?? order?.leaves_qty
+    ?? order?.leavesQty
+    ?? order?.size;
+  if (remainingValue !== undefined && remainingValue !== null && remainingValue !== '') {
+    const remainingSize = Number(remainingValue);
+    if (!Number.isFinite(remainingSize) || remainingSize <= 0) return false;
+  }
   if (!normalized) return true;
-  return ['open', 'working', 'live', 'new', 'partiallyfilled', 'partially_filled'].includes(normalized);
+  return [
+    'open',
+    'working',
+    'live',
+    'new',
+    'active',
+    'accepted',
+    'placed',
+    'booked',
+    'pending',
+    'pendingnew',
+    'partiallyfilled',
+    'enteredbook',
+  ].includes(normalized);
 };
 
-const normalizeOrderStatus = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
 const isClosedOrderStatus = (value: unknown) => (
   ['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalizeOrderStatus(value))
 );
@@ -245,26 +275,51 @@ const getOrderMarket = (order: any) => String(order?.market ?? order?.market_add
 const getSuppressedOrderKey = (orderId: string, subaccount: string) => (
   `${normalizeAddress(subaccount || '')}:${String(orderId || '').trim()}`
 );
+const getClosedOrderIds = (orderHistory: any[]) => new Set(
+  (Array.isArray(orderHistory) ? orderHistory : [])
+    .filter((order: any) => isClosedOrderStatus(pickOrderStatus(order)))
+    .map((order: any) => getOrderId(order))
+    .filter(Boolean),
+);
+const filterDisplayOpenOrders = (orders: any[], orderHistory: any[], subaccount: string, suppressedKeys: Set<string>) => {
+  const closedOrderIds = getClosedOrderIds(orderHistory);
+  return (Array.isArray(orders) ? orders : [])
+    .filter((order: any) => isOpenOrderLike(order))
+    .filter((order: any) => {
+      const orderId = getOrderId(order);
+      return !orderId || !closedOrderIds.has(orderId);
+    })
+    .filter((order: any) => {
+      const orderId = getOrderId(order);
+      if (!orderId) return true;
+      return !suppressedKeys.has(getSuppressedOrderKey(orderId, subaccount));
+    });
+};
 
 const verifyOpenOrderCandidates = async (client: any, account: string, orders: any[]) => {
   const candidates = (Array.isArray(orders) ? orders : []).filter(isOpenOrderLike);
   const results = await Promise.allSettled(candidates.map(async (order) => {
     const orderId = getOrderId(order);
     const market = getOrderMarket(order);
-    if (!orderId || !market || typeof client.getOrderDetail !== 'function') return order;
+    if (!orderId || !market || typeof client.getOrderDetail !== 'function') {
+      return { order, checked: false };
+    }
 
     try {
       const detail = await client.getOrderDetail(account, market, orderId);
-      if (!detail) return null;
-      return isOpenOrderLike(detail) ? { ...order, ...detail } : null;
+      if (!detail) return { order: null, checked: true };
+      return { order: isOpenOrderLike(detail) ? { ...order, ...detail } : null, checked: true };
     } catch (error) {
-      return null;
+      return { order, checked: false };
     }
   }));
 
-  return results.flatMap((result) => (
-    result.status === 'fulfilled' && result.value ? [result.value] : []
+  const values = results.flatMap((result) => (
+    result.status === 'fulfilled' ? [result.value] : []
   ));
+  const checkedValues = values.filter((value) => value.checked);
+  const sourceValues = checkedValues.length > 0 ? checkedValues : values;
+  return sourceValues.flatMap((value) => (value.order ? [value.order] : []));
 };
 
 function App() {
@@ -491,14 +546,14 @@ function App() {
       ));
       const getPreviousOrder = (order: any) => previousState.openOrders.find((previousOrder: any) => (
         normalizeAddress(previousOrder.subaccount || '') === normalizeAddress(order.subaccount || '')
-          && String(previousOrder.order_id || previousOrder.id || '') === String(order.order_id || order.id || '')
+          && getOrderId(previousOrder) === getOrderId(order)
       ));
       const accountResults = await Promise.allSettled(selectedTradingAccounts.map(async (tradingAccount) => {
         const [accountDataResult, positionsResult, ordersResult, orderHistoryResult, portfolioResult] = await Promise.allSettled([
           retryRequest(() => client.getAccount(tradingAccount.address), 3),
           retryRequest(() => client.getPositions(tradingAccount.address), 2),
           retryRequest(() => client.getOpenOrders(tradingAccount.address), 2),
-          retryRequest(() => client.getOrderHistory(tradingAccount.address, '120'), 1),
+          retryRequest(() => client.getOrderHistory(tradingAccount.address, '200'), 1),
           retryRequest(() => client.getPortfolioChartData(tradingAccount.address, range as any, portfolioChartTypeRef.current), 2),
         ]);
 
@@ -506,18 +561,22 @@ function App() {
           throw accountDataResult.reason;
         }
 
-        const verifiedOrders = ordersResult.status === 'fulfilled'
-          ? await verifyOpenOrderCandidates(client, tradingAccount.address, ordersResult.value)
+        const orderHistory = orderHistoryResult.status === 'fulfilled' && Array.isArray(orderHistoryResult.value)
+          ? orderHistoryResult.value
+          : [];
+        const filteredOrders = ordersResult.status === 'fulfilled'
+          ? filterDisplayOpenOrders(ordersResult.value, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current)
+          : [];
+        const verifiedOrders = filteredOrders.length > 0
+          ? await verifyOpenOrderCandidates(client, tradingAccount.address, filteredOrders)
           : [];
 
         return {
           tradingAccount,
           accountData: accountDataResult.value,
           positions: positionsResult.status === 'fulfilled' ? positionsResult.value : getPreviousPositions(tradingAccount.address),
-          orders: verifiedOrders,
-          orderHistory: orderHistoryResult.status === 'fulfilled' && Array.isArray(orderHistoryResult.value)
-            ? orderHistoryResult.value
-            : [],
+          orders: filterDisplayOpenOrders(verifiedOrders, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current),
+          orderHistory,
           portfolio: portfolioResult.status === 'fulfilled' ? portfolioResult.value : null,
           positionsFallback: positionsResult.status !== 'fulfilled',
           ordersFallback: ordersResult.status !== 'fulfilled',
@@ -560,24 +619,12 @@ function App() {
       );
 
       const orders = successfulAccounts.flatMap((result) => {
-        const closedOrderIds = new Set(
-          (Array.isArray(result.orderHistory) ? result.orderHistory : [])
-            .filter((order: any) => isClosedOrderStatus(order?.status))
-            .map((order: any) => getOrderId(order))
-            .filter(Boolean),
-        );
-        return result.orders
-          .filter((order: any) => {
-            const orderId = getOrderId(order);
-            if (!orderId) return true;
-            return !closedOrderIds.has(orderId);
-          })
-          .filter((order: any) => {
-            const orderId = getOrderId(order);
-            if (!orderId) return true;
-            const key = getSuppressedOrderKey(orderId, result.tradingAccount.address);
-            return !suppressedOrderKeysRef.current.has(key);
-          })
+        return filterDisplayOpenOrders(
+          result.orders,
+          result.orderHistory,
+          result.tradingAccount.address,
+          suppressedOrderKeysRef.current,
+        )
           .map((order: any) => ({
             ...order,
             subaccount: result.tradingAccount.address,
@@ -911,12 +958,15 @@ function App() {
     const orderResults = await Promise.allSettled(tradingAccounts.map(async (tradingAccount) => {
       const [orders, orderHistory] = await Promise.all([
         client.getOpenOrders(tradingAccount.address),
-        client.getOrderHistory(tradingAccount.address, '120').catch(() => []),
+        client.getOrderHistory(tradingAccount.address, '200').catch(() => []),
       ]);
-      const verifiedOrders = await verifyOpenOrderCandidates(client, tradingAccount.address, orders);
+      const filteredOrders = filterDisplayOpenOrders(orders, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current);
+      const verifiedOrders = filteredOrders.length > 0
+        ? await verifyOpenOrderCandidates(client, tradingAccount.address, filteredOrders)
+        : [];
       return {
         tradingAccount,
-        orders: verifiedOrders,
+        orders: filterDisplayOpenOrders(verifiedOrders, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current),
         orderHistory,
       };
     }));
@@ -924,30 +974,19 @@ function App() {
     const nextOrders = orderResults
       .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
       .flatMap((result) => {
-        const closedOrderIds = new Set(
-          (Array.isArray(result.value.orderHistory) ? result.value.orderHistory : [])
-            .filter((order: any) => isClosedOrderStatus(order?.status))
-            .map((order: any) => getOrderId(order))
-            .filter(Boolean),
-        );
-        return (Array.isArray(result.value.orders) ? result.value.orders : [])
-          .filter((order: any) => {
-            const orderId = getOrderId(order);
-            return !orderId || !closedOrderIds.has(orderId);
-          })
-          .filter((order: any) => {
-            const orderId = getOrderId(order);
-            if (!orderId) return true;
-            const key = getSuppressedOrderKey(orderId, result.value.tradingAccount.address);
-            return !suppressedOrderKeysRef.current.has(key);
-          })
+        return filterDisplayOpenOrders(
+          result.value.orders,
+          result.value.orderHistory,
+          result.value.tradingAccount.address,
+          suppressedOrderKeysRef.current,
+        )
           .map((order: any) => {
           const size = Number(order.remaining_size || order.size || 0);
           const price = Number(order.price || 0);
           const marketName = marketMap.get(order.market) || order.market_name || order.market?.slice(0, 10) || 'Unknown';
           const previousOrder = previousOrders.find((item: any) => (
             normalizeAddress(item.subaccount || '') === normalizeAddress(result.value.tradingAccount.address)
-              && String(item.order_id || item.id || '') === String(order.order_id || order.id || '')
+              && getOrderId(item) === getOrderId(order)
           ));
           const value = price > 0 ? Math.abs(size) * price : Number(previousOrder?.value || 0);
           return {

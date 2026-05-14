@@ -107,6 +107,15 @@ const writeSeenTradeIds = (ids: Set<string>) => {
   localStorage.setItem(TRADE_SEEN_IDS_KEY, JSON.stringify(compact));
 };
 
+const rememberSeenTradeIds = (previousIds: Set<string>, trades: any[]) => {
+  const nextIds = new Set(previousIds);
+  trades.map(getTradeIdentity).filter(Boolean).forEach((identity) => {
+    nextIds.add(identity);
+  });
+  const compactIds = Array.from(nextIds).slice(-1200);
+  return new Set(compactIds);
+};
+
 const readSuppressedOrderKeys = (): Set<string> => {
   if (typeof window === 'undefined') return new Set();
   try {
@@ -287,7 +296,7 @@ function App() {
   const portfolioRequestIdRef = useRef(0);
   const portfolioChartTypeRef = useRef(portfolioChartType);
   const seenTradeIdsRef = useRef<Set<string>>(readSeenTradeIds());
-  const hasSeededTradeIdsRef = useRef(seenTradeIdsRef.current.size > 0);
+  const hasSeededTradeIdsRef = useRef(false);
   const suppressedOrderKeysRef = useRef<Set<string>>(readSuppressedOrderKeys());
   const canFetch = () => Date.now() - lastFetchRef.current > 5000;
   const markFetchStarted = () => {
@@ -810,7 +819,7 @@ function App() {
         seenTradeIdsRef.current.add(identity);
         return true;
       });
-      seenTradeIdsRef.current = new Set(nextTrades.map(getTradeIdentity).filter(Boolean));
+      seenTradeIdsRef.current = rememberSeenTradeIds(seenTradeIdsRef.current, nextTrades);
       writeSeenTradeIds(seenTradeIdsRef.current);
 
       if (hasSeededTradeIdsRef.current && tradeNotifyMode !== 'off') {
@@ -1130,7 +1139,7 @@ function App() {
     setAmps(null, null);
     const restoredSeenIds = readSeenTradeIds();
     seenTradeIdsRef.current = restoredSeenIds;
-    hasSeededTradeIdsRef.current = restoredSeenIds.size > 0;
+    hasSeededTradeIdsRef.current = false;
   };
 
   const handleRemoveAccount = (address: string) => {

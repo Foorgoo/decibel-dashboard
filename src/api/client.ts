@@ -51,12 +51,15 @@ class DecibelClient {
   }
 
   async getOpenOrders(account: string): Promise<Order[]> {
-    const result = await this.request<{ items: Order[] }>('/open_orders', { account });
-    return result.items || [];
+    const result = await this.request<any>('/open_orders', { account });
+    const items = result?.items || result?.data?.items || result?.data || result?.orders || result;
+    return Array.isArray(items) ? items : [];
   }
 
   async getOrderHistory(account: string, limit = '50'): Promise<Order[]> {
-    return this.request<Order[]>('/orders', { account, limit });
+    const result = await this.request<any>('/orders', { account, limit });
+    const items = result?.items || result?.data?.items || result?.data || result?.orders || result;
+    return Array.isArray(items) ? items : [];
   }
 
   async getTrades(account: string, limit = '50'): Promise<Trade[]> {

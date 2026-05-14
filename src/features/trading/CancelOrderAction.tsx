@@ -28,7 +28,7 @@ const getMarketName = (order: any) => {
 export function CancelOrderAction({ order }: CancelOrderActionProps) {
   const { account: walletAccount, connected, signTransaction, wallet } = useWallet();
   const detectedWalletAddress = useDetectedWalletAddress(connected, wallet, walletAccount);
-  const { apiKey, currentAccount, gasStationApiKey, gasStationEnabled, markets } = useDashboardStore();
+  const { apiKey, currentAccount, gasStationApiKey, gasStationEnabled, markets, openOrders, setOpenOrders } = useDashboardStore();
   const [submitting, setSubmitting] = useState(false);
 
   const orderId = getOrderId(order);
@@ -125,8 +125,13 @@ export function CancelOrderAction({ order }: CancelOrderActionProps) {
         type: 'success',
         title: '取消订单已提交',
       });
+      // Optimistically remove this order from local list to avoid stale duplicate rows
+      setOpenOrders(openOrders.filter((item: any) => !(
+        String(item.order_id || item.id || '') === orderId
+          && normalizeAddress(String(item.subaccount || '')) === normalizeAddress(subaccount)
+      )));
       window.dispatchEvent(new CustomEvent(TRADING_REFRESH_EVENT, {
-        detail: { hash: transactionHash, action: 'cancel_order' },
+        detail: { hash: transactionHash, action: 'cancel_order', orderId, subaccount },
       }));
     } catch (error: unknown) {
       notifyTradingToast({

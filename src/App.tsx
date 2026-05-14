@@ -40,6 +40,8 @@ const APP_VERSION = '0.2.1';
 const CURRENT_YEAR = new Date().getFullYear();
 const TRADE_NOTIFY_MODE_KEY = 'decibel_trade_notify_mode_mainnet';
 const TRADE_NOTIFY_SOUND_KEY = 'decibel_trade_notify_sound_mainnet';
+const TRADE_SEEN_IDS_KEY = 'decibel_seen_trade_ids_mainnet';
+const SUPPRESSED_ORDER_KEYS = 'decibel_suppressed_orders_mainnet';
 const TRADE_NOTIFY_AUDIO_URL = '/sounds/trade-alert.mp3';
 type TradingToast = TradingToastDetail & { id: number };
 type TradeNotifyMode = 'off' | 'key' | 'all';
@@ -86,6 +88,40 @@ const getTradeNotifySoundEnabled = () => {
   if (typeof window === 'undefined') return true;
   const value = localStorage.getItem(TRADE_NOTIFY_SOUND_KEY);
   return value === null ? true : value === 'true';
+};
+
+const readSeenTradeIds = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = JSON.parse(localStorage.getItem(TRADE_SEEN_IDS_KEY) || '[]');
+    if (!Array.isArray(raw)) return new Set();
+    return new Set(raw.map((item) => String(item || '')).filter(Boolean).slice(0, 1200));
+  } catch {
+    return new Set();
+  }
+};
+
+const writeSeenTradeIds = (ids: Set<string>) => {
+  if (typeof window === 'undefined') return;
+  const compact = Array.from(ids).slice(0, 1200);
+  localStorage.setItem(TRADE_SEEN_IDS_KEY, JSON.stringify(compact));
+};
+
+const readSuppressedOrderKeys = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = JSON.parse(localStorage.getItem(SUPPRESSED_ORDER_KEYS) || '[]');
+    if (!Array.isArray(raw)) return new Set();
+    return new Set(raw.map((item) => String(item || '')).filter(Boolean).slice(0, 1200));
+  } catch {
+    return new Set();
+  }
+};
+
+const writeSuppressedOrderKeys = (keys: Set<string>) => {
+  if (typeof window === 'undefined') return;
+  const compact = Array.from(keys).slice(0, 1200);
+  localStorage.setItem(SUPPRESSED_ORDER_KEYS, JSON.stringify(compact));
 };
 
 let tradeNotifyAudio: HTMLAudioElement | null = null;
@@ -196,6 +232,9 @@ const isClosedOrderStatus = (value: unknown) => (
   ['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalizeOrderStatus(value))
 );
 const getOrderId = (order: any) => String(order?.order_id || order?.id || '').trim();
+const getSuppressedOrderKey = (orderId: string, subaccount: string) => (
+  `${normalizeAddress(subaccount || '')}:${String(orderId || '').trim()}`
+);
 
 function App() {
   const {
@@ -247,8 +286,9 @@ function App() {
   const lastTradesFetchRef = useRef(0);
   const portfolioRequestIdRef = useRef(0);
   const portfolioChartTypeRef = useRef(portfolioChartType);
-  const seenTradeIdsRef = useRef<Set<string>>(new Set());
-  const hasSeededTradeIdsRef = useRef(false);
+  const seenTradeIdsRef = useRef<Set<string>>(readSeenTradeIds());
+  const hasSeededTradeIdsRef = useRef(seenTradeIdsRef.current.size > 0);
+  const suppressedOrderKeysRef = useRef<Set<string>>(readSuppressedOrderKeys());
   const canFetch = () => Date.now() - lastFetchRef.current > 5000;
   const markFetchStarted = () => {
     lastFetchRef.current = Date.now();
@@ -498,6 +538,12 @@ function App() {
             const orderId = getOrderId(order);
             if (!orderId) return true;
             return !closedOrderIds.has(orderId);
+          })
+          .filter((order: any) => {
+            const orderId = getOrderId(order);
+            if (!orderId) return true;
+            const key = getSuppressedOrderKey(orderId, result.tradingAccount.address);
+            return !suppressedOrderKeysRef.current.has(key);
           })
           .map((order: any) => ({
             ...order,
@@ -765,6 +811,7 @@ function App() {
         return true;
       });
       seenTradeIdsRef.current = new Set(nextTrades.map(getTradeIdentity).filter(Boolean));
+      writeSeenTradeIds(seenTradeIdsRef.current);
 
       if (hasSeededTradeIdsRef.current && tradeNotifyMode !== 'off') {
         const notifyTrades = freshTrades.filter((trade) => (
@@ -841,6 +888,12 @@ function App() {
           .filter((order: any) => {
             const orderId = getOrderId(order);
             return !orderId || !closedOrderIds.has(orderId);
+          })
+          .filter((order: any) => {
+            const orderId = getOrderId(order);
+            if (!orderId) return true;
+            const key = getSuppressedOrderKey(orderId, result.value.tradingAccount.address);
+            return !suppressedOrderKeysRef.current.has(key);
           })
           .map((order: any) => {
           const size = Number(order.remaining_size || order.size || 0);
@@ -951,9 +1004,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const handleTradingRefresh = () => {
+    const handleTradingRefresh = (event: Event) => {
       const keyToUse = getApiKeyForNetwork();
       if (!keyToUse || selectedOwners.length === 0) return;
+      const detail = (event as CustomEvent<{ action?: string; orderId?: string; subaccount?: string }>).detail;
+      if (detail?.action === 'cancel_order' && detail.orderId && detail.subaccount) {
+        suppressedOrderKeysRef.current.add(getSuppressedOrderKey(detail.orderId, detail.subaccount));
+        writeSuppressedOrderKeys(suppressedOrderKeysRef.current);
+      }
 
       setRefreshing(true);
       refreshOpenOrdersQuick();
@@ -1070,8 +1128,9 @@ function App() {
     setVolume30d(null);
     setPortfolioData([]);
     setAmps(null, null);
-    hasSeededTradeIdsRef.current = false;
-    seenTradeIdsRef.current = new Set();
+    const restoredSeenIds = readSeenTradeIds();
+    seenTradeIdsRef.current = restoredSeenIds;
+    hasSeededTradeIdsRef.current = restoredSeenIds.size > 0;
   };
 
   const handleRemoveAccount = (address: string) => {

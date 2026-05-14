@@ -8,3 +8,4 @@ dist/
 !.env.dashboard
 !.env.trading
 releases/
+dist-server/

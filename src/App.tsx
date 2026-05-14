@@ -183,6 +183,12 @@ const getTradeSideLabel = (trade: any) => {
   return '-';
 };
 
+const isOpenOrderLike = (order: any) => {
+  const normalized = String(order?.status || 'open').trim().toLowerCase();
+  if (!normalized) return true;
+  return !['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalized);
+};
+
 function App() {
   const {
     apiKey,
@@ -400,9 +406,6 @@ function App() {
       const getPreviousPositions = (subaccount: string) => previousState.positions.filter((position: any) => (
         normalizeAddress(position.subaccount || '') === normalizeAddress(subaccount)
       ));
-      const getPreviousOrders = (subaccount: string) => previousState.openOrders.filter((order: any) => (
-        normalizeAddress(order.subaccount || '') === normalizeAddress(subaccount)
-      ));
       const getPreviousPosition = (position: any) => previousState.positions.find((previousPosition: any) => (
         normalizeAddress(previousPosition.subaccount || '') === normalizeAddress(position.subaccount || '')
           && normalizeAddress(previousPosition.market || '') === normalizeAddress(position.market || '')
@@ -427,7 +430,9 @@ function App() {
           tradingAccount,
           accountData: accountDataResult.value,
           positions: positionsResult.status === 'fulfilled' ? positionsResult.value : getPreviousPositions(tradingAccount.address),
-          orders: ordersResult.status === 'fulfilled' ? ordersResult.value : getPreviousOrders(tradingAccount.address),
+          orders: ordersResult.status === 'fulfilled'
+            ? (Array.isArray(ordersResult.value) ? ordersResult.value.filter(isOpenOrderLike) : [])
+            : [],
           portfolio: portfolioResult.status === 'fulfilled' ? portfolioResult.value : null,
           positionsFallback: positionsResult.status !== 'fulfilled',
           ordersFallback: ordersResult.status !== 'fulfilled',
@@ -539,7 +544,9 @@ function App() {
       });
 
       setPositions(enrichedPositions);
-      setOpenOrders(orders.map((order: any) => ({
+      setOpenOrders(orders
+        .filter((order: any) => isOpenOrderLike(order))
+        .map((order: any) => ({
           ...order,
           mark_price: Number(priceMap.get(order.market)?.mark_px || getPreviousOrder(order)?.mark_price || 0),
           market_name: marketMap.get(order.market) || getPreviousOrder(order)?.market_name || order.market?.slice(0, 10) || 'Unknown',
@@ -789,9 +796,11 @@ function App() {
       orders: await client.getOpenOrders(tradingAccount.address),
     })));
     const nextOrders = orderResults
-      .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-      .flatMap((result) => (
-        (Array.isArray(result.value.orders) ? result.value.orders : []).map((order: any) => {
+        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+        .flatMap((result) => (
+        (Array.isArray(result.value.orders) ? result.value.orders : [])
+          .filter((order: any) => isOpenOrderLike(order))
+          .map((order: any) => {
           const size = Number(order.remaining_size || order.size || 0);
           const price = Number(order.price || 0);
           const marketName = marketMap.get(order.market) || order.market_name || order.market?.slice(0, 10) || 'Unknown';

@@ -815,15 +815,33 @@ function App() {
       }));
     if (tradingAccounts.length === 0) return;
 
-    const orderResults = await Promise.allSettled(tradingAccounts.map(async (tradingAccount) => ({
-      tradingAccount,
-      orders: await client.getOpenOrders(tradingAccount.address),
-    })));
+    const orderResults = await Promise.allSettled(tradingAccounts.map(async (tradingAccount) => {
+      const [orders, orderHistory] = await Promise.all([
+        client.getOpenOrders(tradingAccount.address),
+        client.getOrderHistory(tradingAccount.address, '120').catch(() => []),
+      ]);
+      return {
+        tradingAccount,
+        orders,
+        orderHistory,
+      };
+    }));
+    const fulfilledCount = orderResults.filter((result) => result.status === 'fulfilled').length;
     const nextOrders = orderResults
-        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-        .flatMap((result) => (
-        (Array.isArray(result.value.orders) ? result.value.orders : [])
+      .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+      .flatMap((result) => {
+        const closedOrderIds = new Set(
+          (Array.isArray(result.value.orderHistory) ? result.value.orderHistory : [])
+            .filter((order: any) => isClosedOrderStatus(order?.status))
+            .map((order: any) => getOrderId(order))
+            .filter(Boolean),
+        );
+        return (Array.isArray(result.value.orders) ? result.value.orders : [])
           .filter((order: any) => isOpenOrderLike(order))
+          .filter((order: any) => {
+            const orderId = getOrderId(order);
+            return !orderId || !closedOrderIds.has(orderId);
+          })
           .map((order: any) => {
           const size = Number(order.remaining_size || order.size || 0);
           const price = Number(order.price || 0);
@@ -842,10 +860,10 @@ function App() {
             owner: result.value.tradingAccount.owner,
             owner_name: result.value.tradingAccount.ownerName,
           };
-        })
-      ));
+        });
+      });
 
-    if (nextOrders.length > 0 || previousOrders.length === 0) {
+    if (fulfilledCount > 0) {
       setOpenOrders(nextOrders);
     }
   }, [accounts, effectiveAccount, setOpenOrders, subaccountAliases]);

@@ -246,11 +246,6 @@ const getSuppressedOrderKey = (orderId: string, subaccount: string) => (
   `${normalizeAddress(subaccount || '')}:${String(orderId || '').trim()}`
 );
 
-const isMissingOrderDetailError = (error: unknown) => {
-  const message = String((error as any)?.message || error || '').toLowerCase();
-  return message.includes('404') || message.includes('not found') || message.includes('not_found');
-};
-
 const verifyOpenOrderCandidates = async (client: any, account: string, orders: any[]) => {
   const candidates = (Array.isArray(orders) ? orders : []).filter(isOpenOrderLike);
   const results = await Promise.allSettled(candidates.map(async (order) => {
@@ -263,8 +258,7 @@ const verifyOpenOrderCandidates = async (client: any, account: string, orders: a
       if (!detail) return null;
       return isOpenOrderLike(detail) ? { ...order, ...detail } : null;
     } catch (error) {
-      if (isMissingOrderDetailError(error)) return null;
-      return order;
+      return null;
     }
   }));
 

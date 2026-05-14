@@ -1,0 +1,309 @@
+{
+  "bots": [
+    {
+      "botId": "bot-1778773561545",
+      "name": "BTC Maker A Copy",
+      "runMode": "paper",
+      "ownerAddress": "0x-owner-a",
+      "subaccount": "0x-sub-a1",
+      "strategyId": "mm-spread-v1",
+      "strategyVersion": "1.0.0",
+      "symbols": [
+        "BTC"
+      ],
+      "maxNotional": 30000,
+      "maxPosition": 0.6,
+      "maxDailyLoss": 800,
+      "maxSlippageBps": 25,
+      "orderRateLimitPerMin": 35,
+      "quoteSpreadBps": 14,
+      "orderLevels": 3,
+      "levelSpacingBps": 10,
+      "refreshIntervalSec": 5,
+      "minOrderSize": 0.02,
+      "maxOrderSize": 0.18,
+      "inventorySkewBps": 12,
+      "targetInventoryPct": 50,
+      "cancelStaleAfterSec": 15,
+      "postOnly": true,
+      "heartbeatTimeoutSec": 25,
+      "maxConsecutiveErrors": 4,
+      "maxLatencyMs": 1500
+    },
+    {
+      "botId": "bot-mm-001",
+      "name": "BTC Maker A",
+      "runMode": "paper",
+      "ownerAddress": "0x-owner-a",
+      "subaccount": "0x-sub-a1",
+      "strategyId": "mm-spread-v1",
+      "strategyVersion": "1.0.0",
+      "symbols": [
+        "BTC"
+      ],
+      "maxNotional": 30000,
+      "maxPosition": 0.6,
+      "maxDailyLoss": 800,
+      "maxSlippageBps": 25,
+      "orderRateLimitPerMin": 35,
+      "quoteSpreadBps": 14,
+      "orderLevels": 3,
+      "levelSpacingBps": 10,
+      "refreshIntervalSec": 5,
+      "minOrderSize": 0.02,
+      "maxOrderSize": 0.18,
+      "inventorySkewBps": 12,
+      "targetInventoryPct": 50,
+      "cancelStaleAfterSec": 15,
+      "postOnly": true,
+      "heartbeatTimeoutSec": 25,
+      "maxConsecutiveErrors": 4,
+      "maxLatencyMs": 1500
+    },
+    {
+      "strategyId": "mm-spread-v1",
+      "strategyVersion": "1.0.0",
+      "maxNotional": 30000,
+      "maxPosition": 0.6,
+      "maxDailyLoss": 800,
+      "maxSlippageBps": 25,
+      "orderRateLimitPerMin": 35,
+      "quoteSpreadBps": 14,
+      "orderLevels": 3,
+      "levelSpacingBps": 10,
+      "refreshIntervalSec": 5,
+      "minOrderSize": 0.02,
+      "maxOrderSize": 0.18,
+      "inventorySkewBps": 12,
+      "targetInventoryPct": 50,
+      "cancelStaleAfterSec": 15,
+      "postOnly": true,
+      "heartbeatTimeoutSec": 25,
+      "maxConsecutiveErrors": 4,
+      "maxLatencyMs": 1500,
+      "botId": "bot-mm-002",
+      "name": "ETH Maker B",
+      "runMode": "paper",
+      "ownerAddress": "0x-owner-b",
+      "subaccount": "0x-sub-b1",
+      "symbols": [
+        "ETH"
+      ]
+    }
+  ],
+  "runtimes": {
+    "bot-mm-001": {
+      "botId": "bot-mm-001",
+      "status": "TRIPPED",
+      "marketDataStatus": "down",
+      "executionStatus": "down",
+      "latencyMs": 0,
+      "pnlToday": -0.39,
+      "drawdownToday": -0.39,
+      "netExposure": 0.0649,
+      "lastHeartbeatAt": "2026-05-14T15:01:49.647Z"
+    },
+    "bot-mm-002": {
+      "botId": "bot-mm-002",
+      "status": "TRIPPED",
+      "marketDataStatus": "down",
+      "executionStatus": "down",
+      "latencyMs": 0,
+      "pnlToday": 0,
+      "drawdownToday": 0,
+      "netExposure": 0,
+      "lastHeartbeatAt": "2026-05-14T14:20:07.437Z"
+    },
+    "bot-1778773561545": {
+      "botId": "bot-1778773561545",
+      "status": "STOPPED",
+      "marketDataStatus": "unknown",
+      "executionStatus": "unknown",
+      "latencyMs": 0,
+      "pnlToday": 0,
+      "drawdownToday": 0,
+      "netExposure": 0,
+      "lastHeartbeatAt": "2026-05-14T15:46:04.212Z"
+    }
+  },
+  "alerts": [
+    {
+      "id": "alert_1778770909647_4birzc",
+      "botId": "bot-mm-001",
+      "level": "critical",
+      "message": "Bot 已被手动熔断",
+      "createdAt": "2026-05-14T15:01:49.647Z",
+      "acked": false
+    },
+    {
+      "id": "alert_1778768407437_v6x776",
+      "botId": "GLOBAL",
+      "level": "critical",
+      "message": "全部 Bot 已紧急停止",
+      "createdAt": "2026-05-14T14:20:07.437Z",
+      "acked": false
+    },
+    {
+      "id": "alert-1",
+      "botId": "bot-mm-001",
+      "level": "warning",
+      "message": "滑点接近阈值，请检查盘口深度",
+      "createdAt": "2026-05-14T14:19:25.395Z",
+      "acked": false
+    }
+  ],
+  "events": [
+    {
+      "botId": "bot-1778773561545",
+      "type": "系统",
+      "message": "Bot 已创建",
+      "id": "event_1778773564212_izbfpu",
+      "createdAt": "2026-05-14T15:46:04.212Z"
+    },
+    {
+      "botId": "bot-mm-001",
+      "type": "熔断",
+      "message": "熔断：本地后端已接收并执行",
+      "id": "event_1778770909647_1xh5m9",
+      "createdAt": "2026-05-14T15:01:49.647Z"
+    },
+    {
+      "botId": "bot-mm-001",
+      "type": "暂停",
+      "message": "暂停：本地后端已接收并执行",
+      "id": "event_1778770901583_gir5vy",
+      "createdAt": "2026-05-14T15:01:41.583Z"
+    },
+    {
+      "botId": "bot-mm-001",
+      "type": "暂停",
+      "message": "暂停：本地后端已接收并执行",
+      "id": "event_1778770900360_npmv99",
+      "createdAt": "2026-05-14T15:01:40.360Z"
+    },
+    {
+      "botId": "bot-mm-001",
+      "type": "暂停",
+      "message": "暂停：本地后端已接收并执行",
+      "id": "event_1778770874157_au5rse",
+      "createdAt": "2026-05-14T15:01:14.157Z"
+    },
+    {
+      "botId": "bot-mm-001",
+      "type": "启动",
+      "message": "启动：本地后端已接收并执行",
+      "id": "event_1778770484117_grg1u7",
+      "createdAt": "2026-05-14T14:54:44.117Z"
+    },
+    {
+      "botId": "GLOBAL",
+      "type": "熔断",
+      "message": "全部 Bot 已紧急停止",
+      "id": "event_1778768407437_sgpxo9",
+      "createdAt": "2026-05-14T14:20:07.437Z"
+    },
+    {
+      "botId": "bot-mm-001",
+      "type": "启动",
+      "message": "启动：本地后端已接收并执行",
+      "id": "event_1778768404547_6yysvr",
+      "createdAt": "2026-05-14T14:20:04.547Z"
+    },
+    {
+      "id": "event-1",
+      "botId": "GLOBAL",
+      "type": "系统",
+      "message": "本地 Bot 后端已初始化",
+      "createdAt": "2026-05-14T14:19:25.395Z"
+    }
+  ],
+  "strategies": [
+    {
+      "id": "conservative-mm",
+      "name": "稳健做市",
+      "description": "仓位小，滑点限制更紧，适合先小资金观察。",
+      "strategyId": "mm-spread-v1",
+      "strategyVersion": "1.0.0",
+      "maxNotional": 10000,
+      "maxPosition": 0.2,
+      "maxDailyLoss": 300,
+      "maxSlippageBps": 18,
+      "orderRateLimitPerMin": 20,
+      "quoteSpreadBps": 18,
+      "orderLevels": 2,
+      "levelSpacingBps": 12,
+      "refreshIntervalSec": 8,
+      "minOrderSize": 0.01,
+      "maxOrderSize": 0.08,
+      "inventorySkewBps": 8,
+      "targetInventoryPct": 50,
+      "cancelStaleAfterSec": 20,
+      "postOnly": true,
+      "heartbeatTimeoutSec": 30,
+      "maxConsecutiveErrors": 3,
+      "maxLatencyMs": 1200
+    },
+    {
+      "id": "balanced-mm",
+      "name": "均衡做市",
+      "description": "默认配置，适合常规运行和多账号复制。",
+      "strategyId": "mm-spread-v1",
+      "strategyVersion": "1.0.0",
+      "maxNotional": 30000,
+      "maxPosition": 0.6,
+      "maxDailyLoss": 800,
+      "maxSlippageBps": 25,
+      "orderRateLimitPerMin": 35,
+      "quoteSpreadBps": 14,
+      "orderLevels": 3,
+      "levelSpacingBps": 10,
+      "refreshIntervalSec": 5,
+      "minOrderSize": 0.02,
+      "maxOrderSize": 0.18,
+      "inventorySkewBps": 12,
+      "targetInventoryPct": 50,
+      "cancelStaleAfterSec": 15,
+      "postOnly": true,
+      "heartbeatTimeoutSec": 25,
+      "maxConsecutiveErrors": 4,
+      "maxLatencyMs": 1500
+    },
+    {
+      "id": "active-mm",
+      "name": "积极做市",
+      "description": "下单更频繁，限制更宽，适合确认策略稳定后使用。",
+      "strategyId": "mm-spread-v1",
+      "strategyVersion": "1.0.0",
+      "maxNotional": 60000,
+      "maxPosition": 1.2,
+      "maxDailyLoss": 1500,
+      "maxSlippageBps": 35,
+      "orderRateLimitPerMin": 60,
+      "quoteSpreadBps": 10,
+      "orderLevels": 4,
+      "levelSpacingBps": 8,
+      "refreshIntervalSec": 3,
+      "minOrderSize": 0.03,
+      "maxOrderSize": 0.35,
+      "inventorySkewBps": 18,
+      "targetInventoryPct": 50,
+      "cancelStaleAfterSec": 10,
+      "postOnly": true,
+      "heartbeatTimeoutSec": 20,
+      "maxConsecutiveErrors": 5,
+      "maxLatencyMs": 2000
+    }
+  ],
+  "riskRules": [
+    {
+      "id": "global-default",
+      "scope": "global",
+      "target": "GLOBAL",
+      "name": "全局默认限制",
+      "maxNotional": 150000,
+      "maxDailyLoss": 3000,
+      "maxRunningBots": 20,
+      "enabled": true
+    }
+  ]
+}

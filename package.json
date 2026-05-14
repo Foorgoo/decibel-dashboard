@@ -11,7 +11,11 @@
     "build": "tsc && vite build --mode trading",
     "build:dashboard": "tsc && vite build --mode dashboard",
     "build:trading": "tsc && vite build --mode trading",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:server": "node scripts/build-bot-server.mjs",
+    "build:prod": "npm run build && npm run build:server",
+    "serve:bot": "node dist-server/bot-server.mjs",
+    "start": "node dist-server/bot-server.mjs"
   },
   "dependencies": {
     "@aptos-labs/gas-station-client": "^2.0.3",

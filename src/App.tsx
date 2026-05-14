@@ -10,6 +10,8 @@ import { ConfigModal } from './components/ConfigModal';
 import decibelMark from './assets/decibel-mark.svg';
 import { APP_MODE, IS_TRADING_MODE } from './config/appMode';
 import { TradingAuthorizationPanel } from './features/trading/TradingAuthorizationPanel';
+import { BotModuleShell } from './features/bots/BotModuleShell';
+import { useBotStore } from './features/bots/store';
 import {
   aggregatePortfolioData,
   getAmpDailyDelta,
@@ -43,6 +45,7 @@ const TRADE_NOTIFY_SOUND_KEY = 'decibel_trade_notify_sound_mainnet';
 const TRADE_NOTIFY_AUDIO_URL = '/sounds/trade-alert.mp3';
 type TradingToast = TradingToastDetail & { id: number };
 type TradeNotifyMode = 'off' | 'key' | 'all';
+type ViewTab = 'dashboard' | 'bots';
 type CachedSubaccount = { account: string; name?: string; isPrimary?: boolean };
 type SubaccountCache = Record<string, CachedSubaccount[]>;
 const SUBACCOUNT_CACHE_KEY = 'decibel_subaccounts_cache_mainnet';
@@ -183,6 +186,12 @@ const getTradeSideLabel = (trade: any) => {
   return '-';
 };
 
+const isOpenOrderLike = (order: any) => {
+  const normalized = String(order?.status || 'open').trim().toLowerCase();
+  if (!normalized) return true;
+  return !['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalized);
+};
+
 function App() {
   const {
     apiKey,
@@ -226,6 +235,8 @@ function App() {
   const [tradingToasts, setTradingToasts] = useState<TradingToast[]>([]);
   const [tradeNotifyMode, setTradeNotifyMode] = useState<TradeNotifyMode>(getTradeNotifyMode);
   const [tradeNotifySoundEnabled, setTradeNotifySoundEnabled] = useState<boolean>(getTradeNotifySoundEnabled);
+  const [activeViewTab, setActiveViewTab] = useState<ViewTab>('dashboard');
+  const botCount = useBotStore((state) => state.bots.length);
   const lastFetchRef = useRef(0);
   const activeRequestIdRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
@@ -400,9 +411,6 @@ function App() {
       const getPreviousPositions = (subaccount: string) => previousState.positions.filter((position: any) => (
         normalizeAddress(position.subaccount || '') === normalizeAddress(subaccount)
       ));
-      const getPreviousOrders = (subaccount: string) => previousState.openOrders.filter((order: any) => (
-        normalizeAddress(order.subaccount || '') === normalizeAddress(subaccount)
-      ));
       const getPreviousPosition = (position: any) => previousState.positions.find((previousPosition: any) => (
         normalizeAddress(previousPosition.subaccount || '') === normalizeAddress(position.subaccount || '')
           && normalizeAddress(previousPosition.market || '') === normalizeAddress(position.market || '')
@@ -427,7 +435,9 @@ function App() {
           tradingAccount,
           accountData: accountDataResult.value,
           positions: positionsResult.status === 'fulfilled' ? positionsResult.value : getPreviousPositions(tradingAccount.address),
-          orders: ordersResult.status === 'fulfilled' ? ordersResult.value : getPreviousOrders(tradingAccount.address),
+          orders: ordersResult.status === 'fulfilled'
+            ? (Array.isArray(ordersResult.value) ? ordersResult.value.filter(isOpenOrderLike) : [])
+            : [],
           portfolio: portfolioResult.status === 'fulfilled' ? portfolioResult.value : null,
           positionsFallback: positionsResult.status !== 'fulfilled',
           ordersFallback: ordersResult.status !== 'fulfilled',
@@ -539,7 +549,9 @@ function App() {
       });
 
       setPositions(enrichedPositions);
-      setOpenOrders(orders.map((order: any) => ({
+      setOpenOrders(orders
+        .filter((order: any) => isOpenOrderLike(order))
+        .map((order: any) => ({
           ...order,
           mark_price: Number(priceMap.get(order.market)?.mark_px || getPreviousOrder(order)?.mark_price || 0),
           market_name: marketMap.get(order.market) || getPreviousOrder(order)?.market_name || order.market?.slice(0, 10) || 'Unknown',
@@ -788,10 +800,12 @@ function App() {
       tradingAccount,
       orders: await client.getOpenOrders(tradingAccount.address),
     })));
-    const nextOrders = orderResults
-      .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-      .flatMap((result) => (
-        (Array.isArray(result.value.orders) ? result.value.orders : []).map((order: any) => {
+      const nextOrders = orderResults
+        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+        .flatMap((result) => (
+        (Array.isArray(result.value.orders) ? result.value.orders : [])
+          .filter((order: any) => isOpenOrderLike(order))
+          .map((order: any) => {
           const size = Number(order.remaining_size || order.size || 0);
           const price = Number(order.price || 0);
           const marketName = marketMap.get(order.market) || order.market_name || order.market?.slice(0, 10) || 'Unknown';
@@ -1138,6 +1152,13 @@ function App() {
       </header>
 
       <main className="dashboard-content">
+        <div className="view-tabs">
+          <button className={`tab-btn ${activeViewTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveViewTab('dashboard')}>Dashboard</button>
+          <button className={`tab-btn ${activeViewTab === 'bots' ? 'active' : ''}`} onClick={() => setActiveViewTab('bots')}>Bots <span>{botCount}</span></button>
+        </div>
+        {activeViewTab === 'bots' && <BotModuleShell />}
+        {activeViewTab === 'dashboard' && (
+        <>
         {needsConfig ? (
           <div className="empty-state">
             <p>{IS_TRADING_MODE ? '请先配置 API Key，并连接钱包或在设置中添加多账户 Owner' : '请先配置 API Key 和添加主钱包来查看看板数据'}</p>
@@ -1180,6 +1201,8 @@ function App() {
               onTradesTabOpen={loadRecentTrades}
             />
           </div>
+        )}
+        </>
         )}
       </main>
 

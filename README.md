@@ -17,6 +17,7 @@ Decibel Dashboard 是一个面向 Decibel 主网账户的交易看板，用于�
 - 支持 API Key 测试、本地配置导入导出和清除本地数据
 - 默认使用 `trading` 交易版模式，也保留 `dashboard` 纯看板构建模式
 - `trading` 模式支持钱包连接、Session Key 授权、Gas Station 或 Owner 付 gas、限价/市价平仓和撤单
+- Bot 模块独立于主数据面板，支持 Bot 管理、策略编辑、风控规则、告警、操作记录、批量创建和导入导出
 
 ![Preview](./public/preview.png)
 
@@ -82,6 +83,33 @@ https://api.mainnet.aptoslabs.com/decibel/api/v1
 ```
 
 K 线面板使用 Decibel 官方 `/candlesticks` 接口。
+
+## Bot API 契约（MVP）
+
+前端已按以下接口约定接入（`src/api/botTypes.ts`、`src/api/bots.ts`）：
+
+- `GET /api/bots`：返回 `BotSnapshot`
+- `POST /api/bots/:id/start|pause|trip|stop`
+- `POST /api/alerts/:id/ack`
+- `PUT /api/bots/:id`
+- `DELETE /api/bots/:id`
+- `PUT /api/bot-strategies/:id`
+- `DELETE /api/bot-strategies/:id`
+- `PUT /api/bot-risk-rules/:id`
+- `DELETE /api/bot-risk-rules/:id`
+- `POST /api/risk/global-kill-switch`
+
+POST 请求会附带：
+
+- Header: `X-Idempotency-Key`
+- Body: `idempotencyKey`（以及可选 `reason`）
+
+响应支持两种格式：
+
+- 直接返回 `BotSnapshot`
+- 或 envelope：`{ data: BotSnapshot, error?, requestId?, serverTime? }`
+
+开发环境现在已内置本地 Bot 后端，Vite 会直接响应上述接口；如果接口不可用，前端才会降级到浏览器 `localStorage` mock 数据。更通俗的 Bot 模块说明见 `docs/bot-module-user-guide.md`，本地后端说明见 `docs/bot-backend-local.md`，Runner 数据源说明见 `docs/bot-runner-source.md`。
 
 ## 技术栈
 

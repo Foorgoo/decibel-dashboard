@@ -1,0 +1,16 @@
+[Unit]
+Description=Decibel Dashboard Bot Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/decibel-dashboard
+EnvironmentFile=/opt/decibel-dashboard/.env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

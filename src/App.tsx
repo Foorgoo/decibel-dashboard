@@ -185,9 +185,17 @@ const getTradeSideLabel = (trade: any) => {
 
 const isOpenOrderLike = (order: any) => {
   const normalized = String(order?.status || 'open').trim().toLowerCase();
+  const remainingSize = Number(order?.remaining_size ?? order?.remainingSize ?? order?.size ?? 0);
+  if (!Number.isFinite(remainingSize) || remainingSize <= 0) return false;
   if (!normalized) return true;
-  return !['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalized);
+  return ['open', 'working', 'live', 'new', 'partiallyfilled', 'partially_filled'].includes(normalized);
 };
+
+const normalizeOrderStatus = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+const isClosedOrderStatus = (value: unknown) => (
+  ['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalizeOrderStatus(value))
+);
+const getOrderId = (order: any) => String(order?.order_id || order?.id || '').trim();
 
 function App() {
   const {
@@ -415,10 +423,11 @@ function App() {
           && String(previousOrder.order_id || previousOrder.id || '') === String(order.order_id || order.id || '')
       ));
       const accountResults = await Promise.allSettled(selectedTradingAccounts.map(async (tradingAccount) => {
-        const [accountDataResult, positionsResult, ordersResult, portfolioResult] = await Promise.allSettled([
+        const [accountDataResult, positionsResult, ordersResult, orderHistoryResult, portfolioResult] = await Promise.allSettled([
           retryRequest(() => client.getAccount(tradingAccount.address), 3),
           retryRequest(() => client.getPositions(tradingAccount.address), 2),
           retryRequest(() => client.getOpenOrders(tradingAccount.address), 2),
+          retryRequest(() => client.getOrderHistory(tradingAccount.address, '120'), 1),
           retryRequest(() => client.getPortfolioChartData(tradingAccount.address, range as any, portfolioChartTypeRef.current), 2),
         ]);
 
@@ -432,6 +441,9 @@ function App() {
           positions: positionsResult.status === 'fulfilled' ? positionsResult.value : getPreviousPositions(tradingAccount.address),
           orders: ordersResult.status === 'fulfilled'
             ? (Array.isArray(ordersResult.value) ? ordersResult.value.filter(isOpenOrderLike) : [])
+            : [],
+          orderHistory: orderHistoryResult.status === 'fulfilled' && Array.isArray(orderHistoryResult.value)
+            ? orderHistoryResult.value
             : [],
           portfolio: portfolioResult.status === 'fulfilled' ? portfolioResult.value : null,
           positionsFallback: positionsResult.status !== 'fulfilled',
@@ -474,15 +486,27 @@ function App() {
         }))
       );
 
-      const orders = successfulAccounts.flatMap((result) =>
-        result.orders.map((order: any) => ({
-          ...order,
-          subaccount: result.tradingAccount.address,
-          subaccount_name: result.tradingAccount.name,
-          owner: result.tradingAccount.owner,
-          owner_name: result.tradingAccount.ownerName,
-        }))
-      );
+      const orders = successfulAccounts.flatMap((result) => {
+        const closedOrderIds = new Set(
+          (Array.isArray(result.orderHistory) ? result.orderHistory : [])
+            .filter((order: any) => isClosedOrderStatus(order?.status))
+            .map((order: any) => getOrderId(order))
+            .filter(Boolean),
+        );
+        return result.orders
+          .filter((order: any) => {
+            const orderId = getOrderId(order);
+            if (!orderId) return true;
+            return !closedOrderIds.has(orderId);
+          })
+          .map((order: any) => ({
+            ...order,
+            subaccount: result.tradingAccount.address,
+            subaccount_name: result.tradingAccount.name,
+            owner: result.tradingAccount.owner,
+            owner_name: result.tradingAccount.ownerName,
+          }));
+      });
 
       const accountVolume30d = successfulAccounts.reduce((total, result) => {
         const volume = getVolume30d(result.accountData);

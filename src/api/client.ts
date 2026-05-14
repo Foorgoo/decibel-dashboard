@@ -57,9 +57,23 @@ class DecibelClient {
   }
 
   async getOrderHistory(account: string, limit = '50'): Promise<Order[]> {
-    const result = await this.request<any>('/orders', { account, limit });
-    const items = result?.items || result?.data?.items || result?.data || result?.orders || result;
+    const result = await this.request<any>('/order_history', { account, limit });
+    const items = result?.items || result?.data?.items || result?.data || result?.orders || result?.order_history || result;
     return Array.isArray(items) ? items : [];
+  }
+
+  async getOrderDetail(account: string, market: string, orderId: string): Promise<Order | null> {
+    if (!market || !orderId) return null;
+    const result = await this.request<any>('/orders', { account, market, order_id: orderId });
+    return result?.order
+      || result?.data?.order
+      || result?.data?.items?.[0]
+      || result?.items?.[0]
+      || (Array.isArray(result?.data) ? result.data[0] : null)
+      || (Array.isArray(result) ? result[0] : null)
+      || result?.data
+      || result
+      || null;
   }
 
   async getTrades(account: string, limit = '50'): Promise<Trade[]> {

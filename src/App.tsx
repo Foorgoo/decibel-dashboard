@@ -240,10 +240,38 @@ const normalizeOrderStatus = (value: unknown) => String(value || '').trim().toLo
 const isClosedOrderStatus = (value: unknown) => (
   ['filled', 'cancelled', 'canceled', 'closed', 'done', 'executed', 'expired', 'rejected'].includes(normalizeOrderStatus(value))
 );
-const getOrderId = (order: any) => String(order?.order_id || order?.id || '').trim();
+const getOrderId = (order: any) => String(order?.order_id ?? order?.orderId ?? order?.id ?? order?.orderID ?? '').trim();
+const getOrderMarket = (order: any) => String(order?.market ?? order?.market_addr ?? order?.market_address ?? '').trim();
 const getSuppressedOrderKey = (orderId: string, subaccount: string) => (
   `${normalizeAddress(subaccount || '')}:${String(orderId || '').trim()}`
 );
+
+const isMissingOrderDetailError = (error: unknown) => {
+  const message = String((error as any)?.message || error || '').toLowerCase();
+  return message.includes('404') || message.includes('not found') || message.includes('not_found');
+};
+
+const verifyOpenOrderCandidates = async (client: any, account: string, orders: any[]) => {
+  const candidates = (Array.isArray(orders) ? orders : []).filter(isOpenOrderLike);
+  const results = await Promise.allSettled(candidates.map(async (order) => {
+    const orderId = getOrderId(order);
+    const market = getOrderMarket(order);
+    if (!orderId || !market || typeof client.getOrderDetail !== 'function') return order;
+
+    try {
+      const detail = await client.getOrderDetail(account, market, orderId);
+      if (!detail) return null;
+      return isOpenOrderLike(detail) ? { ...order, ...detail } : null;
+    } catch (error) {
+      if (isMissingOrderDetailError(error)) return null;
+      return order;
+    }
+  }));
+
+  return results.flatMap((result) => (
+    result.status === 'fulfilled' && result.value ? [result.value] : []
+  ));
+};
 
 function App() {
   const {
@@ -484,13 +512,15 @@ function App() {
           throw accountDataResult.reason;
         }
 
+        const verifiedOrders = ordersResult.status === 'fulfilled'
+          ? await verifyOpenOrderCandidates(client, tradingAccount.address, ordersResult.value)
+          : [];
+
         return {
           tradingAccount,
           accountData: accountDataResult.value,
           positions: positionsResult.status === 'fulfilled' ? positionsResult.value : getPreviousPositions(tradingAccount.address),
-          orders: ordersResult.status === 'fulfilled'
-            ? (Array.isArray(ordersResult.value) ? ordersResult.value.filter(isOpenOrderLike) : [])
-            : [],
+          orders: verifiedOrders,
           orderHistory: orderHistoryResult.status === 'fulfilled' && Array.isArray(orderHistoryResult.value)
             ? orderHistoryResult.value
             : [],
@@ -717,7 +747,6 @@ function App() {
     const keyToUse = getApiKeyForNetwork();
     const ownersToFetch = getSelectedOwners(effectiveAccount, accounts);
     if (!keyToUse || ownersToFetch.length === 0) {
-      setTrades([]);
       return;
     }
 
@@ -738,7 +767,6 @@ function App() {
       }));
 
     if (tradingAccounts.length === 0) {
-      setTrades([]);
       return;
     }
 
@@ -839,7 +867,22 @@ function App() {
       }
       hasSeededTradeIdsRef.current = true;
 
-      setTrades(nextTrades);
+      const merged = new Map<string, any>();
+      for (const trade of useDashboardStore.getState().trades || []) {
+        const identity = getTradeIdentity(trade);
+        if (identity) merged.set(identity, trade);
+      }
+      for (const trade of nextTrades) {
+        const identity = getTradeIdentity(trade);
+        if (identity) {
+          merged.set(identity, trade);
+        } else {
+          merged.set(`${trade.subaccount || ''}:${trade.market || ''}:${trade.timestamp || ''}:${trade.side || ''}:${trade.size || ''}:${trade.price || ''}`, trade);
+        }
+      }
+      setTrades(Array.from(merged.values())
+        .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+        .slice(0, maxTrades));
     } catch (error: any) {
       if (isLatestTradesRequest()) {
         setError(error?.message || '最近成交读取失败');
@@ -876,9 +919,10 @@ function App() {
         client.getOpenOrders(tradingAccount.address),
         client.getOrderHistory(tradingAccount.address, '120').catch(() => []),
       ]);
+      const verifiedOrders = await verifyOpenOrderCandidates(client, tradingAccount.address, orders);
       return {
         tradingAccount,
-        orders,
+        orders: verifiedOrders,
         orderHistory,
       };
     }));
@@ -893,7 +937,6 @@ function App() {
             .filter(Boolean),
         );
         return (Array.isArray(result.value.orders) ? result.value.orders : [])
-          .filter((order: any) => isOpenOrderLike(order))
           .filter((order: any) => {
             const orderId = getOrderId(order);
             return !orderId || !closedOrderIds.has(orderId);
@@ -1296,7 +1339,6 @@ function App() {
               showTrades
               tradesLoading={tradesLoading}
               onActiveTabChange={handleActiveDataTabChange}
-              onTradesTabOpen={loadRecentTrades}
             />
           </div>
         )}

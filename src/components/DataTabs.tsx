@@ -10,10 +10,9 @@ interface DataTabsProps {
   showTrades: boolean;
   tradesLoading?: boolean;
   onActiveTabChange?: (tab: TabKey) => void;
-  onTradesTabOpen?: () => void;
 }
 
-export function DataTabs({ showTrades, tradesLoading = false, onActiveTabChange, onTradesTabOpen }: DataTabsProps) {
+export function DataTabs({ showTrades, tradesLoading = false, onActiveTabChange }: DataTabsProps) {
   const { currentAccount, positions, openOrders, trades } = useDashboardStore();
   const [activeTab, setActiveTab] = useState<TabKey>('positions');
   const maxTradeCount = currentAccount === 'all' ? 500 : 200;
@@ -50,10 +49,7 @@ export function DataTabs({ showTrades, tradesLoading = false, onActiveTabChange,
         {showTrades && (
           <button
             className={`tab-btn ${activeTab === 'trades' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('trades');
-              onTradesTabOpen?.();
-            }}
+            onClick={() => setActiveTab('trades')}
           >
             最近成交 <span>{tradesLoading ? '...' : Math.min(trades.length, maxTradeCount)}</span>
           </button>

@@ -1233,12 +1233,10 @@ function App() {
       return;
     }
 
-    if (canFetch()) {
-      setRefreshing(true);
-      markFetchStarted();
-      fetchData(chartRange);
+    if (tab === 'orders') {
+      refreshOpenOrdersQuick();
     }
-  }, [chartRange, fetchData, loadRecentTrades, selectedOwners.length]);
+  }, [loadRecentTrades, refreshOpenOrdersQuick, selectedOwners.length]);
 
   const handleSaveApiKey = (mainnetKey: string) => {
     if (typeof window !== 'undefined') {

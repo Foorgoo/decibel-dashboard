@@ -42,6 +42,7 @@ const TRADE_NOTIFY_MODE_KEY = 'decibel_trade_notify_mode_mainnet';
 const TRADE_NOTIFY_SOUND_KEY = 'decibel_trade_notify_sound_mainnet';
 const TRADE_SEEN_IDS_KEY = 'decibel_seen_trade_ids_mainnet';
 const SUPPRESSED_ORDER_KEYS = 'decibel_suppressed_orders_mainnet';
+const ORDER_DETAIL_VERIFY_TTL_MS = 60_000;
 const TRADE_NOTIFY_AUDIO_URL = '/sounds/trade-alert.mp3';
 type TradingToast = TradingToastDetail & { id: number };
 type TradeNotifyMode = 'off' | 'key' | 'all';
@@ -303,62 +304,43 @@ const filterDisplayOpenOrders = (orders: any[], orderHistory: any[], subaccount:
     });
 };
 
-const verifyOpenOrderCandidates = async (
+const verifyAndCollectStaleOrderKeys = async (
   client: any,
-  account: string,
   orders: any[],
-  previousOrders: any[] = [],
-  suppressedKeys?: Set<string>,
+  verifiedAtByOrderKey: Map<string, number>,
 ) => {
-  const previousOrderKeys = new Set(
-    (Array.isArray(previousOrders) ? previousOrders : [])
-      .map((order: any) => getOrderKey(order, order.subaccount || account))
-      .filter((key) => Boolean(key.split(':').pop())),
-  );
-  const candidates = (Array.isArray(orders) ? orders : []).filter(isOpenOrderLike);
+  const now = Date.now();
+  const candidates = (Array.isArray(orders) ? orders : [])
+    .filter(isOpenOrderLike)
+    .filter((order: any) => {
+      const orderKey = getOrderKey(order);
+      const verifiedAt = verifiedAtByOrderKey.get(orderKey) || 0;
+      return Boolean(getOrderId(order) && getOrderMarket(order) && now - verifiedAt > ORDER_DETAIL_VERIFY_TTL_MS);
+    });
+
   const results = await Promise.allSettled(candidates.map(async (order) => {
     const orderId = getOrderId(order);
     const market = getOrderMarket(order);
-    if (!orderId || !market || typeof client.getOrderDetail !== 'function') {
-      return {
-        order: previousOrderKeys.has(getOrderKey(order, account)) ? order : null,
-        checked: false,
-      };
-    }
+    const subaccount = String(order.subaccount || '');
+    if (!subaccount || !orderId || !market || typeof client.getOrderDetail !== 'function') return null;
 
     try {
-      const detail = await client.getOrderDetail(account, market, orderId);
+      const detail = await client.getOrderDetail(subaccount, market, orderId);
       if (!detail || !isOpenOrderLike(detail)) {
-        suppressedKeys?.add(getSuppressedOrderKey(orderId, account));
-        return { order: null, checked: true };
+        return getSuppressedOrderKey(orderId, subaccount);
       }
-      return { order: { ...order, ...detail }, checked: true };
+      verifiedAtByOrderKey.set(getOrderKey(order), Date.now());
+      return null;
     } catch (error) {
       if (isMissingOrderDetailError(error)) {
-        suppressedKeys?.add(getSuppressedOrderKey(orderId, account));
-        return { order: null, checked: true };
+        return getSuppressedOrderKey(orderId, subaccount);
       }
-      return {
-        order: previousOrderKeys.has(getOrderKey(order, account)) ? order : null,
-        checked: false,
-      };
+      return null;
     }
   }));
 
-  const values = results.flatMap((result) => (
-    result.status === 'fulfilled' ? [result.value] : []
-  ));
-  const checkedValues = values.filter((value) => value.checked);
-  const sourceValues = checkedValues.length > 0
-    ? [
-        ...checkedValues,
-        ...values.filter((value) => !value.checked && value.order),
-      ]
-    : values;
-  if (suppressedKeys) {
-    writeSuppressedOrderKeys(suppressedKeys);
-  }
-  return sourceValues.flatMap((value) => (value.order ? [value.order] : []));
+  return results
+    .flatMap((result) => (result.status === 'fulfilled' && result.value ? [result.value] : []));
 };
 
 function App() {
@@ -414,6 +396,8 @@ function App() {
   const seenTradeIdsRef = useRef<Set<string>>(readSeenTradeIds());
   const hasSeededTradeIdsRef = useRef(false);
   const suppressedOrderKeysRef = useRef<Set<string>>(readSuppressedOrderKeys());
+  const verifiedOrderDetailAtRef = useRef<Map<string, number>>(new Map());
+  const orderVerificationRequestIdRef = useRef(0);
   const canFetch = () => Date.now() - lastFetchRef.current > 5000;
   const markFetchStarted = () => {
     lastFetchRef.current = Date.now();
@@ -428,6 +412,40 @@ function App() {
     const key = localStorage.getItem('decibel_api_key_mainnet');
     return key || apiKey || null;
   };
+
+  const verifyOpenOrdersInBackground = useCallback((ordersSnapshot: any[]) => {
+    const keyToUse = getApiKeyForNetwork();
+    if (!keyToUse || !Array.isArray(ordersSnapshot) || ordersSnapshot.length === 0) return;
+
+    const requestId = orderVerificationRequestIdRef.current + 1;
+    orderVerificationRequestIdRef.current = requestId;
+    const client = createDecibelClient(keyToUse);
+
+    void verifyAndCollectStaleOrderKeys(client, ordersSnapshot, verifiedOrderDetailAtRef.current)
+      .then((staleKeys) => {
+        if (orderVerificationRequestIdRef.current !== requestId || staleKeys.length === 0) return;
+        let changed = false;
+        staleKeys.forEach((key) => {
+          if (!suppressedOrderKeysRef.current.has(key)) {
+            suppressedOrderKeysRef.current.add(key);
+            changed = true;
+          }
+        });
+        if (!changed) return;
+
+        writeSuppressedOrderKeys(suppressedOrderKeysRef.current);
+        const currentOrders = useDashboardStore.getState().openOrders || [];
+        const nextOrders = currentOrders.filter((order: any) => {
+          const orderId = getOrderId(order);
+          if (!orderId) return true;
+          return !suppressedOrderKeysRef.current.has(getSuppressedOrderKey(orderId, order.subaccount || ''));
+        });
+        if (nextOrders.length !== currentOrders.length) {
+          setOpenOrders(nextOrders);
+        }
+      })
+      .catch(() => undefined);
+  }, [apiKey, setOpenOrders]);
 
   useEffect(() => {
     portfolioChartTypeRef.current = portfolioChartType;
@@ -606,21 +624,12 @@ function App() {
         const filteredOrders = ordersResult.status === 'fulfilled'
           ? filterDisplayOpenOrders(ordersResult.value, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current)
           : [];
-        const verifiedOrders = filteredOrders.length > 0
-          ? await verifyOpenOrderCandidates(
-            client,
-            tradingAccount.address,
-            filteredOrders,
-            previousState.openOrders,
-            suppressedOrderKeysRef.current,
-          )
-          : [];
 
         return {
           tradingAccount,
           accountData: accountDataResult.value,
           positions: positionsResult.status === 'fulfilled' ? positionsResult.value : getPreviousPositions(tradingAccount.address),
-          orders: filterDisplayOpenOrders(verifiedOrders, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current),
+          orders: filteredOrders,
           orderHistory,
           portfolio: portfolioResult.status === 'fulfilled' ? portfolioResult.value : null,
           positionsFallback: positionsResult.status !== 'fulfilled',
@@ -739,7 +748,7 @@ function App() {
       });
 
       setPositions(enrichedPositions);
-      setOpenOrders(orders
+      const enrichedOrders = orders
         .filter((order: any) => isOpenOrderLike(order))
         .map((order: any) => ({
           ...order,
@@ -756,8 +765,9 @@ function App() {
             ...order,
             value: Number(valuePrice || 0) > 0 ? Math.abs(size) * Number(valuePrice || 0) : Number(previousOrder?.value || 0),
           };
-        })
-      );
+        });
+      setOpenOrders(enrichedOrders);
+      verifyOpenOrdersInBackground(enrichedOrders);
       const portfolioSeries = successfulAccounts
         .map((result) => result.portfolio)
         .filter((portfolio): portfolio is any[] => Array.isArray(portfolio));
@@ -827,7 +837,7 @@ function App() {
         activeAbortRef.current = null;
       }
     }
-  }, [accounts, effectiveAccount, setAccount, setPositions, setOpenOrders, setTrades, setVolume30d, setPortfolioData, setMarkets, setMarketMap, setSubaccounts, subaccountAliases, setAmps, setLoading, setError]);
+  }, [accounts, effectiveAccount, setAccount, setPositions, setOpenOrders, setTrades, setVolume30d, setPortfolioData, setMarkets, setMarketMap, setSubaccounts, subaccountAliases, setAmps, setLoading, setError, verifyOpenOrdersInBackground]);
 
   const loadRecentTrades = useCallback(async () => {
     const keyToUse = getApiKeyForNetwork();
@@ -1006,18 +1016,9 @@ function App() {
         client.getOrderHistory(tradingAccount.address, '200').catch(() => []),
       ]);
       const filteredOrders = filterDisplayOpenOrders(orders, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current);
-      const verifiedOrders = filteredOrders.length > 0
-        ? await verifyOpenOrderCandidates(
-          client,
-          tradingAccount.address,
-          filteredOrders,
-          previousOrders,
-          suppressedOrderKeysRef.current,
-        )
-        : [];
       return {
         tradingAccount,
-        orders: filterDisplayOpenOrders(verifiedOrders, orderHistory, tradingAccount.address, suppressedOrderKeysRef.current),
+        orders: filteredOrders,
         orderHistory,
       };
     }));
@@ -1054,8 +1055,9 @@ function App() {
 
     if (fulfilledCount > 0) {
       setOpenOrders(nextOrders);
+      verifyOpenOrdersInBackground(nextOrders);
     }
-  }, [accounts, effectiveAccount, setOpenOrders, subaccountAliases]);
+  }, [accounts, effectiveAccount, setOpenOrders, subaccountAliases, verifyOpenOrdersInBackground]);
 
   const loadPortfolioChart = useCallback(async (
     range: string,
